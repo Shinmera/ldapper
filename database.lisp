@@ -26,6 +26,7 @@
   (connect)
   (let ((tables (postmodern:list-all-tables)))
     (unless (find "accounts" tables :test #'string= :key #'second)
+      (v:info :ldapper "Setting up database")
       (postmodern:query (:create-table 'accounts
                                        ((id :type integer :primary-key T :identity-always T)
                                         (name :type (varchar 64) :unique T)
@@ -73,13 +74,15 @@
         account
         (error "Bad password."))))
 
-(defun make-account (name mail password &key real-name note classes attributes already-hashed)
+(defun make-account (name mail &key password real-name note classes attributes already-hashed)
   (connect)
   (with-transaction ()
     (let ((id (postmodern:query (:insert-into 'accounts :set
                                               'name name
                                               'mail mail
-                                              'password (if already-hashed password (cryptos:rfc-2307-hash password))
+                                              'password (if password
+                                                            (if already-hashed password (cryptos:rfc-2307-hash password))
+                                                            "")
                                               'real-name real-name
                                               'note (or note "")
                                               :returning 'id)

@@ -66,7 +66,7 @@
                             unless (find k ignored-attributes :test #'string-equal)
                             collect (list k v)))))
 
-(defun account->ldif-record (account &key (output NIL) base-dn)
+(defun account->ldif-record (account &key (output NIL) (base-dn *base-dn*))
   (etypecase output
     (null
      (with-output-to-string (stream)

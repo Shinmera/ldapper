@@ -1,5 +1,6 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defvar *base-dn* NIL)
 (defvar *ldap-servers* '(("0.0.0.0" 389)
                          ("0.0.0.0" 636 :ssl-certificate "ldapper-chain.pem" :ssl-certificate-key "ldapper-key.pem")))
 (defvar *listeners* ())
@@ -14,6 +15,7 @@
            (setf (context listener) (cl+ssl:make-context :certificate-chain-file ssl-certificate :private-key-file ssl-certificate-key :private-key-password ssl-certificate-password)))
           ((or ssl-certificate ssl-certificate-key)
            (error "Need both ssl-certificate and ssl-certificate-key")))
+    (v:info :ldapper "Listening on ~a:~a~@[ SSL~*~]" host port ssl-certificate)
     (setf (socket listener) (usocket:socket-listen host port :reuse-address T :element-type '(unsigned-byte 8)))))
 
 (defmethod close ((listener listener) &key abort)
@@ -33,6 +35,7 @@
   (setf (socket-stream client) (usocket:socket-stream socket)))
 
 (defmethod accept ((listener listener))
+  (v:debug :ldapper "Accepting new connection on ~a" listener)
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
     (if (context listener)
         (make-instance 'ssl-client :socket socket :context (context listener))
@@ -59,6 +62,8 @@
        (progn
          (read-config)
          (connect)
+         (init-database)
+         (v:info :ldapper "Starting server")
          (unless lparallel:*kernel*
            (setf lparallel:*kernel* (lparallel:make-kernel workers :name 'ldapper-clients)))
          (dolist (server (if servers-p servers *ldap-servers*))
@@ -67,6 +72,7 @@
     (stop)))
 
 (defun stop ()
+  (v:info :ldapper "Stopping server")
   (when lparallel:*kernel*
     (lparallel:end-kernel))
   (loop for socket = (pop *listeners*)
