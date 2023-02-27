@@ -56,7 +56,12 @@
           :name (field "cn")
           :mail (field "mail")
           :password (field "userPassword")
-          :real-name (or (field "gecos") (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))
+          :real-name (or (when (and (field "givenName") (field "sn"))
+                           (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))
+                         (field "gecos")
+                         (field "displayName")
+                         (field "sn")
+                         (field "givenName"))
           :note (field "note")
           :classes (loop for (k . v) in record
                          when (or (string-equal k "objectClass")
