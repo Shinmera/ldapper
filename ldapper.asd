@@ -3,11 +3,13 @@
                (:file "database")
                (:file "ldif")
                (:file "protocol")
-               (:file "server"))
+               (:file "server")
+               (:file "config"))
   :depends-on (:usocket
                :postmodern
                :trivial-ldap
                :cl+ssl
                :verbose
                :crypto-shortcuts
-               :lparallel))
+               :lparallel
+               :cl-ppcre))

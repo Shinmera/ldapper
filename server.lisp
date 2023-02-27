@@ -54,13 +54,14 @@
     (cl+ssl:with-global-context (context)
       (setf (socket-stream client) (cl+ssl:make-ssl-server-stream (usocket:socket-stream (socket client)))))))
 
-(defun start (&key (servers *ldap-servers*) (workers 10))
+(defun start (&key (servers NIL servers-p) (workers 10))
   (unwind-protect
        (progn
+         (read-config)
          (connect)
          (unless lparallel:*kernel*
            (setf lparallel:*kernel* (lparallel:make-kernel workers :name 'ldapper-clients)))
-         (dolist (server servers)
+         (dolist (server (if servers-p servers *ldap-servers*))
            (push (apply #'start-listener server) *listeners*))
          (acceptor-loop))
     (stop)))
