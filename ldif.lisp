@@ -3,6 +3,8 @@
 (defparameter *ignored-attributes*
   '("cn" "dn" "mail" "userPassword" "givenName" "sn" "gecos" "note"
     "objectClass" "structuralObjectClass"))
+(defparameter *required-attributes*
+  '("cn" "mail" "userPassword"))
 
 (defun parse-ldif-record (input)
   (etypecase input
@@ -50,7 +52,8 @@
 (defun ldif-record->account (record &key (ignored-attributes *ignored-attributes*))
   (flet ((field (name)
            (cdr (assoc name record :test #'string-equal))))
-    (list :name (field "cn")
+    (list :id NIL
+          :name (field "cn")
           :mail (field "mail")
           :password (field "userPassword")
           :real-name (or (field "gecos") (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))
@@ -63,17 +66,44 @@
                             unless (find k ignored-attributes :test #'string-equal)
                             collect (list k v)))))
 
-(defun import-from-ldif (input)
+(defun account->ldif-record (account &key (output NIL) base-dn)
+  (etypecase output
+    (null
+     (with-output-to-string (stream)
+       (account->ldif-record account :output stream)))
+    (pathname
+     (with-open-file (stream output :direction :output)
+       (account->ldif-record account :output stream)))
+    (stream
+     (let ((account (ensure-account account)))
+       (format output "dn: cn=~a~@[,~a~]~%" (getf account :name) base-dn)
+       (format output "cn: ~a~%" (getf account :name))
+       (dolist (class (getf account :classes))
+         (format output "objectClass: ~a~%" class))
+       (format output "mail: ~a~%" (getf account :mail))
+       (format output "userPassword:: ~a~%" (base64:string-to-base64-string (getf account :password)))
+       (format output "displayName: ~a~%" (getf account :real-name))
+       (format output "note: ~a~%" (getf account :note))
+       (loop for (key val) in (getf account :attributes)
+             do (format output "~a: ~a~%" key val))
+       (format output "~%")))))
+
+(defun import-from-ldif (input &rest args &key (dry-run T) (required-attributes *required-attributes*) (ignored-attributes *ignored-attributes*))
   (etypecase input
     (string
      (with-input-from-string (stream input)
-       (parse-ldif stream)))
+       (apply #'import-from-ldif stream args)))
     (pathname
      (with-open-file (stream input)
-       (parse-ldif stream)))
+       (apply #'import-from-ldif stream args)))
     (stream
      (connect)
-     (postmodern:with-transaction ()
+     (with-transaction ()
        (loop for record = (parse-ldif-record input)
              while record
-             collect (insert-account (ldif-record->account record)))))))
+             when (loop for attribute in required-attributes
+                        always (assoc attribute record :test #'string-equal))
+             collect (let ((account (ldif-record->account record :ignored-attributes ignored-attributes)))
+                       (if dry-run
+                           account
+                           (insert-account account))))))))

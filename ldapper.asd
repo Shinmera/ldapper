@@ -9,4 +9,5 @@
                :trivial-ldap
                :cl+ssl
                :verbose
+               :crypto-shortcuts
                :lparallel))

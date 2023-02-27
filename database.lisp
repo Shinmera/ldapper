@@ -1,9 +1,18 @@
 (in-package #:org.shirakumo.ldapper)
 
 (defvar *postgres-db* "ldap")
-(defvar *postgres-user* "ldapper")
+(defvar *postgres-user* NIL)
 (defvar *postgres-pass* NIL)
 (defvar *postgres-host* "127.0.0.1")
+(defvar *transaction* NIL)
+
+(defmacro with-transaction (args &body body)
+  `(flet ((thunk () ,@body))
+     (if *transaction*
+         (thunk)
+         (postmodern:with-transaction ,args
+           (let ((*transaction* T))
+             (thunk))))))
 
 (defun connect ()
   (unless (and postmodern:*database* (postmodern:connected-p postmodern:*database*))
@@ -45,9 +54,9 @@
                     (string (postmodern:query (:select '* :from 'accounts :where (:= 'name name)) :plist))))
          (id (getf account :id)))
     (when id
-      (setf (getf account :classes) (postmodern:query (:order-by (:select 'class :from 'accounts :where (:= 'account id)) 'class)))
-      (setf (getf account :attributes) (postmodern:query (:order-by (:select 'key 'value :from 'accounts :where (:= 'account id)) 'key))))
-    account))
+      (nconc account
+             (list :classes (postmodern:query (:order-by (:select 'class :from 'classes :where (:= 'account id)) 'class) :column)
+                   :attributes (postmodern:query (:order-by (:select 'key 'value :from 'attributes :where (:= 'account id)) 'key)))))))
 
 (defun ensure-account (account-ish)
   (etypecase account-ish
@@ -60,20 +69,23 @@
 (defun authenticate (account password)
   (connect)
   (let ((account (ensure-account account)))
-    (check-password password (getf account :password))))
+    (if (crypto-shortcuts:check-rfc-2307-hash password (getf account :password))
+        account
+        (error "Bad password."))))
 
 (defun make-account (name mail password &key real-name note classes attributes already-hashed)
   (connect)
-  (postmodern:with-transaction ()
-    (let ((account (postmodern:query (:insert-into 'accounts :set
-                                                   'name name
-                                                   'mail mail
-                                                   'password (if already-hashed password (hash password))
-                                                   'real-name real-name
-                                                   'note note)
-                                     :plist)))
-      (edit-account account :classes classes :attributes attributes)
-      (find-account name))))
+  (with-transaction ()
+    (let ((id (postmodern:query (:insert-into 'accounts :set
+                                              'name name
+                                              'mail mail
+                                              'password (if already-hashed password (cryptos:rfc-2307-hash password))
+                                              'real-name real-name
+                                              'note (or note "")
+                                              :returning 'id)
+                                :single)))
+      (edit-account id :classes classes :attributes attributes)
+      (find-account id))))
 
 (defun insert-account (account)
   (make-account (getf account :name) (getf account :mail) (getf account :password)
@@ -85,7 +97,7 @@
 
 (defun edit-account (account &key mail real-name note password already-hashed (classes NIL classes-p) (attributes NIL attributes-p))
   (connect)
-  (postmodern:with-transaction ()
+  (with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
       (flet ((update (field value)
@@ -94,16 +106,16 @@
         (when mail (update 'mail mail))
         (when real-name (update 'real-name real-name))
         (when note (update 'note note))
-        (when password (update 'password (if already-hashed password (hash password)))))
+        (when password (update 'password (if already-hashed password (cryptos:rfc-2307-hash password)))))
       (when classes-p
         (postmodern:query (:delete-from 'classes :where (:= 'account id)))
-        (postmodern:query (:insert-into 'classes :columns 'account 'class
-                                        :values (loop for class in classes
-                                                      collect (list id class))))
+        (postmodern:query (:insert-rows-into 'classes :columns 'account 'class
+                                             :values (loop for class in classes
+                                                           collect (list id class))))
         (setf (getf account :classes) classes))
       (when attributes-p
         (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
-        (postmodern:query (:insert-into 'attributes :columns 'account 'key 'value
+        (postmodern:query (:insert-rows-into 'attributes :columns 'account 'key 'value
                            :values (loop for (key val) in attributes
                                          collect (list id key val))))
         (setf (getf account :attributes) attributes))
@@ -111,7 +123,7 @@
 
 (defun delete-account (account)
   (connect)
-  (postmodern:with-transaction ()
+  (with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
       (postmodern:query (:delete-from 'classes :where (:= 'account id)))
