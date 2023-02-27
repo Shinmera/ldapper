@@ -5,6 +5,7 @@
   :components ((:file "package")
                (:file "database")
                (:file "ldif")
+               (:file "ldap")
                (:file "protocol")
                (:file "server")
                (:file "config")
@@ -16,4 +17,5 @@
                :verbose
                :crypto-shortcuts
                :lparallel
-               :cl-ppcre))
+               :cl-ppcre
+               :babel))
