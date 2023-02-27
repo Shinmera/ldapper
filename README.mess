@@ -26,6 +26,9 @@ You can also mass import accounts from an ldif file:
 
 ::
 ldapper import accounts.ldif
+ldapper import <(slapcat -b "dc=example,dc=com")
 ::
+
+(note the ``--dry-run`` flag for that)
 
 And that's pretty much it. For more information, see the help as described above.
