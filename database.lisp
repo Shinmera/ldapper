@@ -39,6 +39,7 @@
   (postmodern:query (:order-by (:select '* :from 'accounts) 'name) :plists))
 
 (defun find-account (name)
+  (connect)
   (let* ((account (etypecase name
                     (integer (postmodern:query (:select '* :from 'accounts :where (:= 'id name)) :plist))
                     (string (postmodern:query (:select '* :from 'accounts :where (:= 'name name)) :plist))))
@@ -57,22 +58,33 @@
          (error "No account with name ~s found" account-ish)))))
 
 (defun authenticate (account password)
+  (connect)
   (let ((account (ensure-account account)))
     (check-password password (getf account :password))))
 
-(defun make-account (name mail password &key real-name note classes attributes)
+(defun make-account (name mail password &key real-name note classes attributes already-hashed)
+  (connect)
   (postmodern:with-transaction ()
     (let ((account (postmodern:query (:insert-into 'accounts :set
                                                    'name name
                                                    'mail mail
-                                                   'password (hash password)
+                                                   'password (if already-hashed password (hash password))
                                                    'real-name real-name
                                                    'note note)
                                      :plist)))
       (edit-account account :classes classes :attributes attributes)
       (find-account name))))
 
-(defun edit-account (account &key mail real-name note password (classes NIL classes-p) (attributes NIL attributes-p))
+(defun insert-account (account)
+  (make-account (getf account :name) (getf account :mail) (getf account :password)
+                :real-name (getf account :real-name)
+                :note (getf account :note)
+                :classes (getf account :classes)
+                :attributes (getf account :attributes)
+                :already-hashed T))
+
+(defun edit-account (account &key mail real-name note password already-hashed (classes NIL classes-p) (attributes NIL attributes-p))
+  (connect)
   (postmodern:with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
@@ -82,7 +94,7 @@
         (when mail (update 'mail mail))
         (when real-name (update 'real-name real-name))
         (when note (update 'note note))
-        (when password (update 'password (hash password))))
+        (when password (update 'password (if already-hashed password (hash password)))))
       (when classes-p
         (postmodern:query (:delete-from 'classes :where (:= 'account id)))
         (postmodern:query (:insert-into 'classes :columns 'account 'class
@@ -98,6 +110,7 @@
       account)))
 
 (defun delete-account (account)
+  (connect)
   (postmodern:with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
