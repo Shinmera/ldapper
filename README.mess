@@ -1,0 +1,31 @@
+## About LDAPPER
+This is a //very// simple implementation of an LDAP server, backed by a Postgres database. If you're fed up with the complicated mess that is OpenLDAP or ActiveDirectory, and just need a simple accounts database that can be accessed from other services, this is for you!
+
+## How To
+Compile a binary for ldapper with ``sbcl --eval (asdf:make :ldapper)``, which should give you an ``ldapper`` binary.
+
+Before you do anything else, please read the help documentation with the supported options and parameters thoroughly:
+
+::
+ldapper help
+::
+
+To install the necessary systemd service and get everything set up, simply run install, passing along the database parameters:
+
+::
+LDAPPER_POSTGRES_PW=... ldapper install
+::
+
+And that's it. Your LDAP server is up and running! To add new user accounts, you can invoke ldapper from any other place that has access to the Postgres database:
+
+::
+ldapper add MyAccount whatever@example.com
+::
+
+You can also mass import accounts from an ldif file:
+
+::
+ldapper import accounts.ldif
+::
+
+And that's pretty much it. For more information, see the help as described above.
