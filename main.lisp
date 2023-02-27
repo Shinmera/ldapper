@@ -55,7 +55,7 @@ RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
-" self))
+" (truename self)))
                  (with-open-file (stream "/etc/default/ldapper" :direction :output :if-exists NIL)
                    (when stream (print-config stream)))
                  (when start (uiop:run-program (list "systemctl" "start" unit)))
