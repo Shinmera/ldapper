@@ -247,8 +247,6 @@
 (setf (ber-tag :seq) (encode-ber-tag :universal :constructed #x10))
 (setf (ber-tag :set) (encode-ber-tag :universal :constructed #x11))
 
-(setf (ber-tag :pass) (encode-ber-tag :context :primitive 0))
-
 (defun encode-null (&optional (vec (vec)))
   (encode-ber-sequence :null #() vec))
 
@@ -282,41 +280,7 @@
         do (encode (encode-kv attribute values) vec))
   vec)
 
-(defun encode-filter (filter &optional (vec (vec)))
-  (encode-ber-tag :context :constructed (ldap-filter->id (car filter)) vec)
-  (ecase (first filter)
-    ((:and :or)
-     (let ((sub (vec)))
-       (dolist (expr (rest filter))
-         (encode-filter expr sub))
-       (encode-ber-length (length sub) vec)
-       (vector-append-extend sub vec)))
-    (:not
-     (destructuring-bind (expr) (rest filter)
-       (let ((sub (encode-filter expr)))
-         (encode-ber-length (length sub) vec)
-         (vector-append-extend sub vec))))
-    (:=*
-     (vector-pop vec)
-     (encode-ber-tag :context :primitive (ldap-filter->id (car filter)) vec)
-     (destructuring-bind (key) (rest filter)
-       (let ((octets (babel:string-to-octets key :encoding :utf-8)))
-         (encode-ber-length (length octets) vec)
-         (vector-append-extend octets vec))))
-    ((:= :>= :<= :~=)
-     (destructuring-bind (key val) (rest filter)
-       (let ((sub (encode* key val)))
-         (encode-ber-length (length sub) vec)
-         (vector-append-extend sub vec))))
-    (:substring
-     (destructuring-bind (key val) (rest filter)
-       (let ((sub (vec)))
-         (encode key sub)
-         ;; TODO: this
-         (error "implement")
-         (encode-ber-length (length sub) vec)
-         (vector-append-extend sub vec)))))
-  vec)
+(defgeneric encode-object (object vec))
 
 (defun encode (thing &optional (vec (vec)))
   (typecase thing
@@ -334,12 +298,13 @@
     (dolist (part parts vec)
       (encode part vec))))
 
+(defgeneric decode-object (object vec start end))
+
 (defun decode (vec &optional (start 0))
   (let ((tag (gethash (aref vec start) *ber-tags*)))
     (incf start)
     (case tag
-      ((NIL) (multiple-value-bind (class p/c id) (decode-ber-tag vec (1- start))
-               (error "Unknown tag ~a ~a ~a" class p/c id)))
+      ((NIL) (values (1- start) most-positive-fixnum))
       (:null (values 'null (1+ start)))
       (:bool (values (< 0 (aref vec start)) (1+ start)))
       (:int (decode-ber-integer vec start))
@@ -358,48 +323,14 @@
                           object))
           start))
 
-(defmethod decode-object ((tag (eql :pass)) vec start end)
-  (values (babel:octets-to-string vec :start start :end end :encoding :utf-8)
-          end))
-
 ;; FIXME: bad macro, not pure
 (defmacro with-decoding (parts (vec &rest decode-args) &body body)
   (let ((p (gensym "PARTS"))
         (s (gensym "START")))
     `(multiple-value-bind (,p ,(or (first decode-args) s)) (decode* ,vec ,@decode-args)
-       ,@(unless (first decode-args) `((declare (ignore ,s))))
+       (declare (ignorable ,(or (first decode-args) s)))
        (destructuring-bind ,parts ,p
          ,@body))))
-
-(defun decode-filter (vec &optional (start 0))
-  (multiple-value-bind (class p/c id start) (decode-ber-tag vec start)
-    (declare (ignore p/c))
-    (assert (eql :context class))
-    (ecase (id->ldap-filter id)
-      ((:and :or)
-       (multiple-value-bind (len start) (decode-ber-length vec start)
-         (values (list* (id->ldap-filter id)
-                        (loop with end = (+ start len)
-                              until (<= end start)
-                              collect (multiple-value-bind (filter next) (decode-filter vec start)
-                                        (setf start next)
-                                        filter)))
-                 start)))
-      (:not
-       (multiple-value-bind (len start) (decode-ber-length vec start)
-         (values (list :not (decode-filter vec start))
-                 (+ start len))))
-      (:=*
-       (multiple-value-bind (len start) (decode-ber-length vec start)
-         (values (list :=* (babel:octets-to-string vec :start start :end (+ start len) :encoding :utf-8))
-                 (+ start len))))
-      ((:= :>= :<= :~=)
-       (multiple-value-bind (len start) (decode-ber-length vec start)
-         (with-decoding (key val) (vec start (+ start len))
-           (values (list (id->ldap-filter id) key val)
-                   start))))
-      (:substring
-       (error "implement")))))
 
 (defun encode-message (id payload)
   (encode (encode* id payload)))
@@ -408,188 +339,3 @@
   (multiple-value-bind (message start) (decode vec start)
     (multiple-value-bind (id off) (decode message)
       (values id (decode message off) start))))
-
-(defclass command () ())
-
-(defgeneric tag (command))
-(defgeneric decode-object (tag vec start end))
-(defgeneric encode-object (command vec))
-
-(defmethod decode-object ((tag symbol) vec start end)
-  (decode-object (make-instance tag) vec start end))
-
-(defmethod decode-object :around ((command command) vec start end)
-  (values command (call-next-method)))
-
-(defmethod encode-object :around (object (vec vector))
-  (call-next-method)
-  vec)
-
-(defmethod tag ((command command))
-  (type-of command))
-
-(defclass bind (command)
-  ((version :initarg :version :accessor version) 
-   (user :initarg :user :accessor user)
-   (pass :initarg :pass :accessor pass)))
-
-(defmethod decode-object ((command bind) vec start end)
-  (with-decoding (version user pass) (vec start end)
-    (setf (version command) version)
-    (setf (user command) user)
-    (setf (pass command) pass)
-    start))
-
-(defmethod encode-object ((command bind) vec)
-  (encode (version command) vec)
-  (encode (user command) vec)
-  (encode-ber-tag :context :primitive 0 vec)
-  (vector-append-extend (babel:octets-to-string (pass command) :encoding :utf-8) vec))
-
-(defclass unbind (command)
-  ())
-
-(defmethod decode-object ((command unbind) vec start end)
-  (with-decoding (null) (vec start end)
-    (assert (eql 'null null))
-    start))
-
-(defmethod encode-object ((command unbind) vec)
-  (encode 'null vec))
-
-(defclass abandon (command)
-  ((id :initarg :id :accessor id)))
-
-(defmethod decode-object ((command abandon) vec start end)
-  (with-decoding (id) (vec start end)
-    (setf (id command) id)
-    start))
-
-(defmethod encode-object ((command abandon) vec)
-  (encode (id command) vec))
-
-(defclass add (command)
-  ((domain-name :initarg :domain-name :accessor domain-name) 
-   (attributes :initarg :attributes :accessor attributes)))
-
-(defmethod decode-object ((command add) vec start end)
-  (with-decoding (domain-name attributes) (vec start end)
-    (setf (domain-name command) domain-name)
-    (with-decoding (&rest attributes) (attributes)
-      (setf (attributes command) (loop for attrvec in attributes
-                                       for (attribute valvec) = (decode* attrvec)
-                                       collect (cons attribute (decode* valvec)))))
-    start))
-
-(defmethod encode-object ((command add) vec)
-  (encode (domain-name command) vec)
-  (encode (encode-alist (attributes command)) vec))
-
-(defclass del (command)
-  ((domain-name :initarg :domain-name :accessor domain-name)))
-
-(defmethod decode-object ((command del) vec start end)
-  (setf (domain-name command) (babel:octets-to-string vec :start start :end end :encoding :utf-8)))
-
-(defmethod encode-object ((command del) vec)
-  (vector-append-extend (babel:string-to-octets (domain-name command) :encoding :utf-8) vec))
-
-(defclass moddn (command)
-  ((domain-name :initarg :domain-name :accessor domain-name)
-   (new-domain-name :initarg :new-domain-name :accessor new-domain-name)
-   (delete-old-p :initarg :delete-old-p :accessor delete-old-p)
-   (new-sup :initarg :new-sup :accessor new-sup)))
-
-(defmethod decode-object ((command moddn) vec start end)
-  (with-decoding (domain-name new-domain-name delete-old-p &optional new-sup) (vec start end)
-    (setf (domain-name command) domain-name)
-    (setf (new-domain-name command) new-domain-name)
-    (setf (delete-old-p command) delete-old-p)
-    (setf (new-sup command) new-sup)
-    start))
-
-(defmethod encode-object ((command moddn) vec)
-  (encode (domain-name command) vec)
-  (encode (new-domain-name command) vec)
-  (encode-boolean (delete-old-p command) vec)
-  (when (new-sup command)
-    (encode (new-sup command) vec)))
-
-(defclass compare (command)
-  ((domain-name :initarg :domain-name :accessor domain-name)
-   (attribute :initarg :attribute :accessor attribute)
-   (value :initarg :value :accessor value)))
-
-(defmethod decode-object ((command compare) vec start end)
-  (with-decoding (domain-name pair) (vec start end)
-    (setf (domain-name command) domain-name)
-    (destructuring-bind (attribute value) (decode* pair)
-      (setf (attribute command) attribute)
-      (setf (value command) value)
-      start)))
-
-(defmethod encode-object ((command compare) vec)
-  (encode (domain-name command) vec)
-  (encode (encode* (attribute command) (value command)) vec))
-
-(defclass modify (command)
-  ((domain-name :initarg :domain-name :accessor domain-name) 
-   (modifications :initarg :modifications :accessor modifications)))
-
-(defmethod decode-object ((command modify) vec start end)
-  (with-decoding (domain-name modifications) (vec start end)
-    (setf (domain-name command) domain-name)
-    (with-decoding (&rest modifications) (modifications)
-      (setf (modifications command) (loop for modvec in modifications
-                                          for (type attrvec) = (decode* modvec)
-                                          for (attribute valvec) = (decode* attrvec)
-                                          collect (list* (id->ldap-modify-type type) attribute (decode* valvec)))))
-    start))
-
-(defmethod encode-object ((command modify) vec)
-  (encode (domain-name command) vec)
-  (let ((modifications (vec)))
-    (loop for (type attribute . values) in (modifications command)
-          for mod-seq = (vec)
-          do (encode type mod-seq)
-             (encode (encode-kv attribute values) mod-seq)
-             (encode mod-seq modifications))
-    (encode modifications vec)))
-
-(defclass lookup (command)
-  ((filter :initarg :filter :accessor filter)
-   (base :initarg :base :accessor base)
-   (scope :initarg :scope :initform :base :accessor scope)
-   (deref :initarg :deref :initform :always :accessor deref)
-   (size :initarg :size :initform 0 :accessor size)
-   (timestamp :initarg :timestamp :initform 0 :accessor timestamp)
-   (types-p :initarg :types-p :initform NIL :accessor types-p)
-   (attributes :initarg :attributes :initform () :accessor attributes)
-   (paging-size :initarg :paging-size :initform NIL :accessor paging-size)
-   (paging-cookie :initarg :paging-cookie :initform NIL :accessor paging-cookie)))
-
-(defmethod decode-object ((command lookup) vec start end)
-  (with-decoding (base scope deref size timestamp types-p filter attrs &optional controls) (vec start end)
-    (setf (base command) base)
-    (setf (scope command) (id->ldap-scope scope))
-    (setf (deref command) (id->ldap-deref deref))
-    (setf (size command) size)
-    (setf (timestamp command) timestamp)
-    (setf (types-p command) types-p)
-    (setf (attributes command) (decode* attrs))
-    (setf (filter command) (decode-filter filter))
-    (when controls)
-    start))
-
-(defmethod encode-object ((command lookup) vec)
-  (encode (base command) vec)
-  (encode (scope command) vec)
-  (encode (deref command) vec)
-  (encode (size command) vec)
-  (encode (timestamp command) vec)
-  (encode-boolean (types-p command) vec)
-  (encode-filter (filter command) vec)
-  (encode (apply #'encode* (attributes command)) vec)
-  (when (and (paging-size command) (= 0 (size command)))
-    (encode-ber-tag :context :constructed 0 vec)
-    (encode (encode* +ldap-control-extension-paging+ T (encode* (paging-size command) (paging-cookie command))) vec)))

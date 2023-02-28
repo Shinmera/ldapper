@@ -6,6 +6,7 @@
                (:file "database")
                (:file "ldif")
                (:file "ldap")
+               (:file "commands")
                (:file "protocol")
                (:file "server")
                (:file "config")
