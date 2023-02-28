@@ -259,3 +259,45 @@
                    start))))
       (:substring
        (error "implement")))))
+
+(defvar *extended-oid-map* (make-hash-table :test 'equal))
+
+(defun oid-type (oid)
+  (gethash oid *extended-oid-map* 'extended))
+
+(defun (setf oid-type) (type oid)
+  (setf (gethash oid *extended-oid-map*) type))
+
+(defclass extended (command)
+  ((oid :initarg :oid :accessor oid)
+   (value :initarg :value :initform NIL :accessor value)))
+
+(defmethod decode-object ((command extended) vec start end)
+  (with-decoding (oid &optional value) (vec start end)
+    (setf (oid command) oid)
+    (setf (value command) value)
+    (change-class command (oid-type oid))
+    start))
+
+(defmethod encode-object ((command extended) vec)
+  (encode (oid command) vec)
+  (when (value command)
+    (encode (value command) vec)))
+
+(defclass password-change (extended)
+  ((user :initarg :user :accessor user)
+   (pass :initarg :pass :accessor pass)
+   (new-pass :initarg :new-pass :accessor new-pass)))
+
+(setf (oid-type "1.3.6.1.4.1.4203.1.11.1") 'password-change)
+
+(defmethod update-instance-for-different-class :after ((previous extended) (command password-change) &key)
+  (with-decoding (user pass new-pass) ((value command))
+    (setf (user command) user)
+    (setf (pass command) pass)
+    (setf (new-pass command) new-pass)))
+
+(defclass starttls (extended)
+  ())
+
+(setf (oid-type "1.3.6.1.4.1.1466.20037") 'starttls)

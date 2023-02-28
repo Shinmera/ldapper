@@ -1,5 +1,8 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defvar +ldap-disconnect+ "1.3.6.1.4.1.1466.20036")
+(defvar +ldap-control-extension-paging+ "1.2.840.113556.1.4.319")
+
 (defun vec ()
   (make-array 0 :adjustable T :fill-pointer T :element-type '(unsigned-byte 8)))
 
@@ -103,9 +106,6 @@
           do (setf (ldb (byte 8 (* 8 i)) int) (aref vec start))
              (incf start))
     (values int start)))
-
-(defvar +ldap-disconnection-response+ "1.3.6.1.4.1.1466.20036")
-(defvar +ldap-control-extension-paging+ "1.2.840.113556.1.4.319")
 
 (define-map (id ldap-command)
   (0  :bind-request)
@@ -234,6 +234,7 @@
 (setf (ber-tag 'abandon) (encode-ber-tag :application :primitive :abandon-request))
 (setf (ber-tag 'unbind) (encode-ber-tag :application :primitive :unbind-request))
 (setf (ber-tag 'modify) (encode-ber-tag :application :constructed :modify-request))
+(setf (ber-tag 'extended) (encode-ber-tag :application :constructed :extended-request))
 (setf (ber-tag :controls) (encode-ber-tag :context :constructed 0))
 (setf (ber-tag :referral) (encode-ber-tag :context :constructed :search-request))
 (setf (ber-tag :extended-response) (encode-ber-tag :application :constructed :extended-response))
