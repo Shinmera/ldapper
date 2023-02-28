@@ -29,7 +29,8 @@
 (defclass client ()
   ((socket :initarg :socket :initform NIL :accessor socket)
    (socket-stream :initform NIL :accessor socket-stream)
-   (channel :initform (lparallel:make-channel) :accessor channel)))
+   (channel :initform (lparallel:make-channel) :accessor channel)
+   (account :initform NIL :accessor account)))
 
 (defmethod initialize-instance :after ((client client) &key socket)
   (setf (socket-stream client) (usocket:socket-stream socket)))
@@ -88,4 +89,4 @@
 
 (defmethod serve ((client client))
   (loop while (open-stream-p (socket-stream client))
-        do (process-command (read-command (socket-stream client)) (socket-stream client))))
+        do (process-command (read-command (socket-stream client)) client)))

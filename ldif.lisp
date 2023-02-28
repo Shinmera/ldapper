@@ -49,27 +49,34 @@
      (loop for record = (parse-ldif-record input)
            while record collect record))))
 
+(defun spread-record (record)
+  (loop for (k . v) in record
+        append (if (consp v)
+                   (loop for value in v collect (cons k value))
+                   (list (cons k v)))))
+
 (defun ldif-record->account (record &key (ignored-attributes *ignored-attributes*))
-  (flet ((field (name)
-           (cdr (assoc name record :test #'string-equal))))
-    (list :id NIL
-          :name (field "cn")
-          :mail (field "mail")
-          :password (field "userPassword")
-          :real-name (or (when (and (field "givenName") (field "sn"))
-                           (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))
-                         (field "gecos")
-                         (field "displayName")
-                         (field "sn")
-                         (field "givenName"))
-          :note (field "note")
-          :classes (loop for (k . v) in record
-                         when (or (string-equal k "objectClass")
-                                  (string-equal k "structuralObjectClass"))
-                         collect v)
-          :attributes (loop for (k . v) in record
-                            unless (find k ignored-attributes :test #'string-equal)
-                            collect (list k v)))))
+  (let ((record (spread-record record)))
+    (flet ((field (name)
+             (cdr (assoc name record :test #'string-equal))))
+      (list :id NIL
+            :name (field "cn")
+            :mail (field "mail")
+            :password (field "userPassword")
+            :real-name (or (when (and (field "givenName") (field "sn"))
+                             (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))
+                           (field "gecos")
+                           (field "displayName")
+                           (field "sn")
+                           (field "givenName"))
+            :note (field "note")
+            :classes (loop for (k . v) in record
+                           when (or (string-equal k "objectClass")
+                                    (string-equal k "structuralObjectClass"))
+                           collect v)
+            :attributes (loop for (k . v) in record
+                              unless (find k ignored-attributes :test #'string-equal)
+                              collect (list k v))))))
 
 (defun account->ldif-record (account &key (output NIL) (base-dn *base-dn*))
   (etypecase output

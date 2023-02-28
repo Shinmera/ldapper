@@ -70,7 +70,7 @@
 
 (defclass add (command)
   ((domain-name :initarg :domain-name :accessor domain-name) 
-   (attributes :initarg :attributes :accessor attributes)))
+   (attributes :initarg :attributes :initform () :accessor attributes)))
 
 (defmethod decode-object ((command add) vec start end)
   (with-decoding (domain-name attributes) (vec start end)
@@ -97,8 +97,8 @@
 (defclass moddn (command)
   ((domain-name :initarg :domain-name :accessor domain-name)
    (new-domain-name :initarg :new-domain-name :accessor new-domain-name)
-   (delete-old-p :initarg :delete-old-p :accessor delete-old-p)
-   (new-sup :initarg :new-sup :accessor new-sup)))
+   (delete-old-p :initarg :delete-old-p :initform T :accessor delete-old-p)
+   (new-sup :initarg :new-sup :initform NIL :accessor new-sup)))
 
 (defmethod decode-object ((command moddn) vec start end)
   (with-decoding (domain-name new-domain-name delete-old-p &optional new-sup) (vec start end)
@@ -134,7 +134,7 @@
 
 (defclass modify (command)
   ((domain-name :initarg :domain-name :accessor domain-name) 
-   (modifications :initarg :modifications :accessor modifications)))
+   (modifications :initarg :modifications :initform () :accessor modifications)))
 
 (defmethod decode-object ((command modify) vec start end)
   (with-decoding (domain-name modifications) (vec start end)
