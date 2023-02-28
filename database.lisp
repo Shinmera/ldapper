@@ -115,7 +115,8 @@
       (edit-account id :classes classes :attributes attributes))))
 
 (defun insert-account (account)
-  (make-account (getf account :name) (getf account :mail) (getf account :password)
+  (make-account (getf account :name) (getf account :mail)
+                :password (getf account :password)
                 :real-name (getf account :real-name)
                 :note (getf account :note)
                 :classes (getf account :classes)
