@@ -123,7 +123,7 @@
                 :attributes (getf account :attributes)
                 :already-hashed T))
 
-(defun edit-account (account &key mail real-name note password already-hashed (classes NIL classes-p) (attributes NIL attributes-p))
+(defun edit-account (account &key name mail real-name note password already-hashed (classes NIL classes-p) (attributes NIL attributes-p))
   (connect)
   (with-transaction ()
     (let* ((account (ensure-account account))
@@ -131,6 +131,7 @@
       (flet ((update (karg field value)
                (postmodern:query (:update 'accounts :set field value :where (:= 'id id)))
                (setf (getf account karg) value)))
+        (when name (update :name 'name name))
         (when mail (update :mail 'mail mail))
         (when real-name (update :real-name 'real-name real-name))
         (when note (update 'note note :note))
