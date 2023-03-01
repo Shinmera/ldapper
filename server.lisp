@@ -3,6 +3,7 @@
 (defvar *base-dn* NIL)
 (defvar *ldap-servers* '(("0.0.0.0" 389)
                          ("0.0.0.0" 636 :ssl-certificate "ldapper-chain.pem" :ssl-certificate-key "ldapper-key.pem")))
+(defvar *workers* 20)
 (defvar *listeners* ())
 
 (defclass listener ()
@@ -69,7 +70,7 @@
     (cl+ssl:with-global-context (context)
       (setf (socket-stream client) (cl+ssl:make-ssl-server-stream (usocket:socket-stream (socket client)))))))
 
-(defun start (&key (servers NIL servers-p) (workers 10))
+(defun start (&key (servers NIL servers-p) (workers *workers*))
   (unwind-protect
        (progn
          (read-config)

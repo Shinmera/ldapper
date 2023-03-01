@@ -238,6 +238,7 @@
   (with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
+      (postmodern:query (:delete-from 'admins :where (:= 'account id)))
       (postmodern:query (:delete-from 'classes :where (:= 'account id)))
       (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
       (postmodern:query (:delete-from 'accounts :where (:= 'id id)))

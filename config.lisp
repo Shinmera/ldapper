@@ -26,6 +26,7 @@
                    ((string-equal var "LDAPPER_POSTGRES_PASS") (setf *postgres-pass* val))
                    ((string-equal var "LDAPPER_POSTGRES_DB") (setf *postgres-db* val))
                    ((string-equal var "LDAPPER_BASE_DN") (setf *base-dn* val))
+                   ((string-equal var "LDAPPER_WORKERS") (setf *workers* (parse-integer val)))
                    ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen)))))
       (with-open-file (stream file :if-does-not-exist NIL)
         (when stream
@@ -38,14 +39,15 @@
         (setf *ldap-servers* listen)))))
 
 (defun read-envvars ()
-  (macrolet ((maybe-set (var envvar)
+  (macrolet ((maybe-set (var envvar &optional (transform 'identity))
                `(let ((var (envvar ,envvar)))
-                  (when var (setf ,var var)))))
+                  (when var (setf ,var (,transform var))))))
     (maybe-set *postgres-host* "LDAPPER_POSTGRES_HOST")
     (maybe-set *postgres-user* "LDAPPER_POSTGRES_USER")
     (maybe-set *postgres-pass* "LDAPPER_POSTGRES_PASS")
     (maybe-set *postgres-db* "LDAPPER_POSTGRES_DB")
     (maybe-set *base-dn* "LDAPPER_BASE_DN")
+    (maybe-set *workers* "LDAPPER_WORKERS" parse-integer)
     (let ((listen (envvar "LDAPPER_LISTEN")))
       (when listen
         (setf *ldap-servers* (list (parse-listen-config listen)))))))
@@ -61,6 +63,7 @@
   (when *postgres-pass* (format stream "~&LDAPPER_POSTGRES_PASS=~a~%" *postgres-pass*))
   (when *postgres-db* (format stream "~&LDAPPER_POSTGRES_DB=~a~%" *postgres-db*))
   (when *base-dn* (format stream "~&LDAPPER_BASE_DN=~a~%" *base-dn*))
+  (when *workers* (format stream "~&LDAPPER_WORKERS=~a~%" *workers*))
   (dolist (server *ldap-servers*)
     (destructuring-bind (host port &key ssl-certificate ssl-certificate-key ssl-certificate-password) server
       (format stream "~&LDAPPER_LISTEN=~a ~a~@[ ssl-cert=~a~]~@[ ssl-key=~a~]~@[ ssl-pass=~a~]~%"

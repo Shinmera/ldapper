@@ -34,6 +34,21 @@
                    (format *standard-output* "~{~a: ~a~%~}" peer))))
               ((string-equal command "remove")
                (delete-account (or (first args) (error "NAME required"))))
+              ((string-equal command "passwd")
+               (let ((name (pop args)))
+                 (unless name (error "NAME required"))
+                 (let ((account (ensure-account name)) new rep)
+                   (format *query-io* "~&Enter the new password: ")
+                   (setf new (read-line *query-io*))
+                   (format *query-io* "~&Repeat the password: ")
+                   (setf rep (read-line *query-io*))
+                   (if (equal rep new)
+                       (edit-account account :password new)
+                       (error "The passwords do not match.")))))
+              ((string-equal command "admin")
+               (let ((name (pop args)) (admin (if args (string-equal "true" (pop args)) T)))
+                 (unless name (error "NAME required"))
+                 (setf (account-admin-p name) admin)))
               ((string-equal command "install")
                (let ((unit "ldapper") (start T) (enable T))
                  (loop for (key val) on args by #'cddr
@@ -96,6 +111,10 @@ Command can be:
     NAME                 --- The name of the account to remove
   passwd --- Change the password of an account
     NAME                 --- Will prompt for the password on STDIN
+  admin  --- Change whether an account is an admin or not
+    NAME                 --- The name of the account to change
+    [BOOLEAN]            --- Whether the account should be admin.
+                             [true]
   install --- Install a basic server setup with systemd
     --unit UNIT          --- The service unit name to use [ldapper]
     --start BOOLEAN      --- Whether to start the service [true]
@@ -112,6 +131,9 @@ The following configuration variables exist:
   LDAPPER_POSTGRES_PASS       --- The password of the postgres user
   LDAPPER_POSTGRES_DB         --- The postgres database to use [ldap]
   LDAPPER_BASE_DN             --- The base domain name to be used.
+  LDAPPER_WORKERS             --- The number of worker threads to
+                                  spawn. Limits the concurrent users.
+                                  [20]
   LDAPPER_LISTEN              --- Can be specified multiple times to
                                   specify servers must be in the
                                   following format, where FILE may be
