@@ -44,7 +44,10 @@
       (postmodern:query (:create-table 'attributes
                                        ((account :type integer :references ((accounts id)))
                                         (key :type (varchar 64))
-                                        (value :type text)))))))
+                                        (value :type text)))))
+    (unless (find "admins" tables :test #'string= :key #'second)
+      (postmodern:query (:create-table 'admins
+                                       ((account :type integer :references ((accounts id)) :unique T)))))))
 
 (defun list-accounts ()
   (connect)
@@ -68,6 +71,20 @@
     ((or string integer)
      (or (find-account account-ish)
          (error 'no-such-account :name account-ish)))))
+
+(defun account-admin-p (account)
+  (etypecase account
+    (integer (postmodern:query (:select '* :from 'admins :where (:= 'account account)) :single))
+    (string (account-admin-p (ensure-account account)))
+    (cons (postmodern:query (:select '* :from 'admins :where (:= 'account (getf account :id))) :single))))
+
+(defun (setf account-admin-p) (admin-p account)
+  (let ((account (ensure-account account)))
+    (cond ((and admin-p (not (account-admin-p account)))
+           (postmodern:query (:insert-into 'admins :set 'account (getf account :id))))
+          ((and (not admin-p) (account-admin-p account))
+           (postmodern:query (:delete-from 'admins :where (:= 'account (getf account :id))))))
+    admin-p))
 
 (defun search-accounts (attribute value &key full)
   (macrolet ((query (&rest query)
