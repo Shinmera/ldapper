@@ -113,7 +113,7 @@
 
 (defmethod serve ((client client))
   (restart-case
-      (handler-bind (((or end-of-file usocket:socket-error) #'abort))
+      (handler-bind (((or stream-error usocket:socket-error) #'abort))
         (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
               do (unless (nth-value 1 (usocket:wait-for-input (socket client) :timeout 10.0))
                    (error 'usocket:timeout-error :socket (socket client)))
