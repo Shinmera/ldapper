@@ -145,25 +145,26 @@
       ((:= :>= :<= :~=)
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "(LOWER(atrs.attribute) =")
+          (format stream "(LOWER(atrs.key) = LOWER(")
           (escape (second filter))
-          (format stream " AND atrs.value"))
+          (format stream ") AND LOWER(atrs.value)"))
          (:classes
           (format stream "(LOWER(cls.class)"))
          (T
-          (format stream "(~(~a~)" (attribute-key (second filter)))))
+          (format stream "(LOWER(~(~a~))" (attribute-key (second filter)))))
        (ecase (first filter)
-         (:= (format stream " = "))
+         (:= (format stream " = LOWER("))
          (:>= (format stream " >= "))
          (:<= (format stream " <= "))
-         (:~= (format stream " ILIKE ")))
+         (:~= (format stream " ILIKE (")))
        (escape (third filter))
-       (format stream ")"))
+       (format stream "))"))
       (:=*
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "LOWER(atrs.attribute) = ")
-          (escape (second filter)))
+          (format stream "LOWER(atrs.key) = LOWER(")
+          (escape (second filter))
+          (format stream ")"))
          (:classes
           (format stream "(cls.class IS NOT NULL)"))
          (T
