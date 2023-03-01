@@ -11,6 +11,7 @@
                          ("0.0.0.0" 636 :ssl-certificate "ldapper-chain.pem" :ssl-certificate-key "ldapper-key.pem")))
 (defvar *workers* 20)
 (defvar *listeners* ())
+(defvar *thread* NIL)
 
 (defclass listener ()
   ((socket :initform NIL :accessor socket)
@@ -42,19 +43,21 @@
    (account :initform NIL :accessor account)))
 
 (defmethod initialize-instance :after ((client client) &key socket)
-  (setf (socket-stream client) (usocket:socket-stream socket)))
+  (setf (socket-stream client) (usocket:socket-stream socket))
+  (v:debug :ldapper "~a Accepting new connection" client))
 
 (defmethod print-object ((client client) stream)
   (print-unreadable-object (client stream :type T)
     (let ((socket (socket client)))
       (if socket
-          (handler-case (format stream "~a" (usocket:get-peer-name socket))
+          (handler-case (format stream "~a:~a"
+                                (usocket:vector-quad-to-dotted-quad (usocket:get-peer-address socket))
+                                (usocket:get-peer-port socket))
             (error () (format stream "CLOSING")))
           (format stream "CLOSED")))))
 
 (defmethod accept ((listener listener))
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
-    (v:debug :ldapper "Accepting new connection on ~a" (usocket:get-peer-name socket))
     (if (context listener)
         (make-instance 'ssl-client :socket socket :context (context listener))
         (make-instance 'client :socket socket))))
@@ -99,11 +102,14 @@
   (disconnect))
 
 (defun acceptor-loop ()
-  (loop for ready = (usocket:wait-for-input (mapcar #'socket *listeners*) :ready-only T)
-        do (loop for socket in ready
-                 for listener = (find socket *listeners* :key #'socket)
-                 for client = (accept listener)
-                 do (lparallel:submit-task (channel client) #'serve client))))
+  (restart-case
+      (loop for ready = (usocket:wait-for-input (mapcar #'socket *listeners*) :ready-only T)
+            do (loop for socket in ready
+                     for listener = (find socket *listeners* :key #'socket)
+                     for client = (accept listener)
+                     do (lparallel:submit-task (channel client) #'serve client)))
+    (abort ()
+      :report "Exit the acceptor loop")))
 
 (defmethod serve ((client client))
   (restart-case
@@ -115,3 +121,15 @@
     (abort ()
       :report "Disconnect the client."
       (close client))))
+
+(defun start-threaded ()
+  (when (and *thread* (bt:thread-alive-p *thread*))
+    (error "Already running!"))
+  (setf *thread* (bt:make-thread #'start :name "ldapper")))
+
+(defun stop-threaded ()
+  (when (and *thread* (bt:thread-alive-p *thread*))
+    (bt:interrupt-thread *thread* #'abort)
+    (loop while (bt:thread-alive-p *thread*)
+          do (sleep 0.01))
+    (setf *thread* NIL)))
