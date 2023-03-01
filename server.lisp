@@ -37,24 +37,22 @@
     (setf (context listener) NIL)))
 
 (defclass client ()
-  ((socket :initarg :socket :initform NIL :accessor socket)
+  ((id :accessor id)
+   (socket :initarg :socket :initform NIL :accessor socket)
    (socket-stream :initform NIL :accessor socket-stream)
    (channel :initform (lparallel:make-channel) :accessor channel)
    (account :initform NIL :accessor account)))
 
 (defmethod initialize-instance :after ((client client) &key socket)
   (setf (socket-stream client) (usocket:socket-stream socket))
+  (setf (id client) (format NIL "~a:~a"
+                            (usocket:vector-quad-to-dotted-quad (usocket:get-peer-address socket))
+                            (usocket:get-peer-port socket)))
   (v:debug :ldapper "~a Accepting new connection" client))
 
 (defmethod print-object ((client client) stream)
   (print-unreadable-object (client stream :type T)
-    (let ((socket (socket client)))
-      (if socket
-          (handler-case (format stream "~a:~a"
-                                (usocket:vector-quad-to-dotted-quad (usocket:get-peer-address socket))
-                                (usocket:get-peer-port socket))
-            (error () (format stream "CLOSING")))
-          (format stream "CLOSED")))))
+    (format stream "~a~@[ CLOSED~]" (id client) (open-stream-p (socket-stream client)))))
 
 (defmethod accept ((listener listener))
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
