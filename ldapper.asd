@@ -15,7 +15,6 @@
                (:file "main"))
   :depends-on (:usocket
                :postmodern
-               :trivial-ldap
                :cl+ssl
                :verbose
                :crypto-shortcuts
