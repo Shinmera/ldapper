@@ -9,7 +9,7 @@
               ((string-equal command "stop")
                (error "Not implemented lol"))
               ((string-equal command "list")
-               (dolist (account (list-accounts)) (account->ldif-record account :output *standard-output*)))
+               (dolist (account (list-accounts)) (account->ldif-text account :output *standard-output* :trusted T)))
               ((string-equal command "import")
                (let ((add-args ()) (file (pop args)))
                  (loop for (key val) on args by #'cddr
@@ -18,7 +18,7 @@
                                 ((string-equal key "--ignore") (push val (getf add-args :ignored-attributes)))
                                 (T (error "Unknown key argument ~a" key))))
                  (let ((accounts (apply #'import-from-ldif file add-args)))
-                   (dolist (account accounts) (account->ldif-record account :output *standard-output*)))))
+                   (dolist (account accounts) (account->ldif-text account :output *standard-output* :trusted T)))))
               ((string-equal command "add")
                (let ((add-args ()) (name (pop args)) (mail (pop args)))
                  (unless name (error "NAME required"))

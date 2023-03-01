@@ -6,7 +6,7 @@
 (defparameter *required-attributes*
   '("cn" "mail" "userPassword"))
 
-(defun parse-ldif-record (input)
+(defun parse-ldap-record (input)
   (etypecase input
     (string
      (with-input-from-string (stream input)
@@ -46,7 +46,7 @@
      (with-open-file (stream input)
        (parse-ldif stream)))
     (stream
-     (loop for record = (parse-ldif-record input)
+     (loop for record = (parse-ldap-record input)
            while record collect record))))
 
 (defun spread-record (record)
@@ -55,7 +55,7 @@
                    (loop for value in v collect (cons k value))
                    (list (cons k v)))))
 
-(defun ldif-record->account (record &key (ignored-attributes *ignored-attributes*))
+(defun ldap-record->account (record &key (ignored-attributes *ignored-attributes*))
   (let ((record (spread-record record)))
     (flet ((field (name)
              (cdr (assoc name record :test #'string-equal))))
@@ -106,27 +106,34 @@
         (T
          :attributes)))
 
-(defun account->ldif-record (account &key (output NIL) (base-dn *base-dn*))
+(defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn)
+  (let ((account (ensure-account account))
+        (record ()))
+    (unless skip-dn
+      (push (list "dn" (account-dn account :base-dn base-dn)) record))
+    (push (list* "objectClass" (getf account :classes)) record)
+    (push (list "cn" (getf account :name)) record)
+    (push (list "mail" (getf account :mail)) record)
+    (when trusted
+      (push (list "userPassword" (base64:string-to-base64-string (getf account :password))) record))
+    (push (list "displayName" (getf account :real-name)) record)
+    (push (list "note" (getf account :note)) record)
+    (append (nreverse record)
+            (getf account :attributes))))
+
+(defun account->ldif-text (account &rest args &key (output NIL) (base-dn *base-dn*) trusted)
   (etypecase output
     (null
      (with-output-to-string (stream)
-       (account->ldif-record account :output stream)))
+       (apply #'account->ldif-text account :output stream args)))
     (pathname
      (with-open-file (stream output :direction :output)
-       (account->ldif-record account :output stream)))
+       (apply #'account->ldif-text account :output stream args)))
     (stream
-     (let ((account (ensure-account account)))
-       (format output "dn: cn=~a~@[,~a~]~%" (getf account :name) base-dn)
-       (format output "cn: ~a~%" (getf account :name))
-       (dolist (class (getf account :classes))
-         (format output "objectClass: ~a~%" class))
-       (format output "mail: ~a~%" (getf account :mail))
-       (format output "userPassword:: ~a~%" (base64:string-to-base64-string (getf account :password)))
-       (format output "displayName: ~a~%" (getf account :real-name))
-       (format output "note: ~a~%" (getf account :note))
-       (loop for (key val) in (getf account :attributes)
-             do (format output "~a: ~a~%" key val))
-       (format output "~%")))))
+     (loop for (attribute . values) in (account->ldap-record (ensure-account account) :base-dn base-dn :trusted trusted)
+           do (dolist (val values)
+                (format output "~a: ~a~%" attribute val)))
+     (terpri output))))
 
 (defun import-from-ldif (input &rest args &key (dry-run T) (required-attributes *required-attributes*) (ignored-attributes *ignored-attributes*))
   (etypecase input
@@ -139,11 +146,11 @@
     (stream
      (connect)
      (with-transaction ()
-       (loop for record = (parse-ldif-record input)
+       (loop for record = (parse-ldap-record input)
              while record
              when (loop for attribute in required-attributes
                         always (assoc attribute record :test #'string-equal))
-             collect (let ((account (ldif-record->account record :ignored-attributes ignored-attributes)))
+             collect (let ((account (ldap-record->account record :ignored-attributes ignored-attributes)))
                        (if dry-run
                            account
                            (insert-account account))))))))

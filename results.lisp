@@ -25,8 +25,15 @@
   (when (sasl-response result)
     (encode (sasl-response result) vec)))
 
-(defclass lookup-entry (result)
-  ())
+(defclass lookup-entry (message)
+  ((domain-name :initarg :domain-name :accessor domain-name)
+   (attributes :initarg :attributes :initform () :accessor attributes)))
+
+(defmethod encode-object ((result lookup-entry) vec)
+  (encode (domain-name result) vec)
+  (encode (encode-alist (attributes result)) vec))
+
+(defmethod tag ((entry lookup-entry)) 'lookup-entry)
 
 (defclass lookup-done (result)
   ())

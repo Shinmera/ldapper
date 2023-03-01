@@ -122,11 +122,11 @@
       ((:= :>= :<= :~=)
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "(atrs.attribute =")
+          (format stream "(LOWER(atrs.attribute) =")
           (escape (second filter))
           (format stream " AND atrs.value"))
          (:classes
-          (format stream "(cls.class"))
+          (format stream "(LOWER(cls.class)"))
          (T
           (format stream "(~(~a~)" (attribute-key (second filter)))))
        (ecase (first filter)
@@ -139,11 +139,10 @@
       (:=*
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "atrs.attribute = ")
+          (format stream "LOWER(atrs.attribute) = ")
           (escape (second filter)))
          (:classes
-          (format stream "cls.class = ")
-          (escape (second filter)))
+          (format stream "(cls.class IS NOT NULL)"))
          (T
           (format stream "~(~a~) != ''" (attribute-key (second filter))))))
       (:substring))))

@@ -3,8 +3,8 @@
 (defvar +ldap-disconnect+ "1.3.6.1.4.1.1466.20036")
 (defvar +ldap-control-extension-paging+ "1.2.840.113556.1.4.319")
 
-(defun vec ()
-  (make-array 0 :adjustable T :fill-pointer T :element-type '(unsigned-byte 8)))
+(defun vec (&optional initial-contents)
+  (make-array (length initial-contents) :adjustable T :fill-pointer T :element-type '(unsigned-byte 8) :initial-contents initial-contents))
 
 (defun vector-append-extend (new vec)
   (loop for el across new
@@ -338,7 +338,7 @@
     (case tag
       ((NIL) (values (1- start) most-positive-fixnum))
       (:null (values 'null (1+ start)))
-      (:bool (values (< 0 (aref vec start)) (1+ start)))
+      (:bool (values (< 0 (aref vec (1+ start))) (+ start 2)))
       (:int (decode-ber-integer vec start))
       (:enum (decode-ber-integer vec start))
       (:str (multiple-value-bind (octets start) (decode-ber-sequence vec start)
@@ -348,8 +348,9 @@
       (T (multiple-value-bind (length start) (decode-ber-length vec start)
            (decode-object tag vec start (+ start length)))))))
 
-(defun decode* (vec &optional (start 0) (end (length vec)))
+(defun decode* (vec &optional (start 0) (end (length vec)) &key (count most-positive-fixnum))
   (values (loop while (< start end)
+                repeat count
                 collect (multiple-value-bind (object next) (decode vec start)
                           (setf start next)
                           object))
