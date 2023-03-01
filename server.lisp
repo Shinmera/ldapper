@@ -101,7 +101,7 @@
 
 (defmethod serve ((client client))
   (restart-case
-      (handler-bind ((end-of-file #'abort))
+      (handler-bind (((or end-of-file usocket:socket-error) #'abort))
         (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
               for command = (read-command (socket-stream client))
               do (process-command command client)))
