@@ -94,6 +94,71 @@
           (T
            (query :inner-join 'attributes :on (:= 'id 'account) :where (:and (:ilike 'key attribute) (:ilike 'value (or value "%"))) :group-by 'id)))))
 
+(defun %filter-to-sql (filter stream)
+  (flet ((escape (string)
+           (write-char #\' stream)
+           (loop for char across string
+                 do (case char
+                      ((#\' #\\) (write-char #\\ stream)))
+                    (write-char char stream))
+           (write-char #\' stream)))
+    (ecase (first filter)
+      (:and
+       (format stream "(")
+       (loop for (sub . next) on (rest filter)
+             do (%filter-to-sql sub stream)
+                (when next (format stream " AND ")))
+       (format stream ")"))
+      (:or
+       (format stream "(")
+       (loop for (sub . next) on (rest filter)
+             do (%filter-to-sql sub stream)
+                (when next (format stream " OR ")))
+       (format stream ")"))
+      (:not
+       (format stream "NOT (")
+       (%filter-to-sql (second filter) stream)
+       (format stream ")"))
+      ((:= :>= :<= :~=)
+       (case (attribute-key (second filter))
+         (:attributes
+          (format stream "(atrs.attribute =")
+          (escape (second filter))
+          (format stream " AND atrs.value"))
+         (:classes
+          (format stream "(cls.class"))
+         (T
+          (format stream "(~(~a~)" (attribute-key (second filter)))))
+       (ecase (first filter)
+         (:= (format stream " = "))
+         (:>= (format stream " >= "))
+         (:<= (format stream " <= "))
+         (:~= (format stream " ILIKE ")))
+       (escape (third filter))
+       (format stream ")"))
+      (:=*
+       (case (attribute-key (second filter))
+         (:attributes
+          (format stream "atrs.attribute = ")
+          (escape (second filter)))
+         (:classes
+          (format stream "cls.class = ")
+          (escape (second filter)))
+         (T
+          (format stream "~(~a~) != ''" (attribute-key (second filter))))))
+      (:substring))))
+
+(defun filter-to-sql (filter &optional limit)
+  (with-output-to-string (stream)
+    (format stream "SELECT id FROM accounts INNER JOIN classes AS cls ON (id = cls.account) INNER JOIN attributes AS atrs ON (id = atrs.account) WHERE ")
+    (%filter-to-sql filter stream)
+    (format stream " GROUP BY id")
+    (when limit (format stream " LIMIT ~d" limit))))
+
+(defun filter-accounts (filter &key limit)
+  (let ((filter (filter-to-sql filter limit)))
+    (mapcar #'find-account (postmodern:query filter :column))))
+
 (defun authenticate (account password)
   (connect)
   (let ((account (ensure-account account)))
