@@ -19,9 +19,9 @@
 (defmethod code ((condition authentication-failed)) :invalid-credentials)
 
 (define-condition permission-denied (ldapper-error)
-  ((account :initarg :account :reader account))
-  (:report (lambda (c s) (format s "~a is not permitted to perform this action."
-                                 (getf (account c) :name "Anonymous")))))
+  ((name :initarg :name :reader name))
+  (:report (lambda (c s) (format s "~s is not permitted to perform this action."
+                                 (getf (name c) :name "Anonymous")))))
 
 (defmethod code ((condition permission-denied)) :insufficient-access-rights)
 

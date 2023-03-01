@@ -1,5 +1,12 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defun check-admin (account)
+  (unless (and account (account-admin-p account))
+    (error 'permission-denied :name (etypecase account
+                                      (null "Anonymous")
+                                      (string account)
+                                      (cons (getf account :name))))))
+
 (defmethod send ((message message))
   (let ((stream (socket-stream (client message))))
     (write-sequence (encode-message message) stream)
@@ -40,15 +47,18 @@
   (v:info :ldapper "~a: Ignoring abandon command" client))
 
 (defmethod process-command ((command add) (client client))
+  (check-admin (account client))
   (let* ((record (list* (cons "cn" (cn-from-dn (domain-name command))) (attributes command)))
          (account (insert-account (ldap-record->account record))))
     (reply command :domain-name (account-dn account))))
 
 (defmethod process-command ((command del) (client client))
+  (check-admin (account client))
   (let ((account (delete-account (cn-from-dn (domain-name command)))))
     (reply command :domain-name (account-dn account))))
 
 (defmethod process-command ((command moddn) (client client))
+  (check-admin (account client))
   (let ((account (ensure-account (cn-from-dn command)))
         (new-name (cn-from-dn (new-domain-name command))))
     (cond ((delete-old-p command)
@@ -74,6 +84,7 @@
                    :domain-name (account-dn account))))
 
 (defmethod process-command ((command modify) (client client))
+  (check-admin (account client))
   (let* ((account (ensure-account (cn-from-dn (domain-name command))))
          (args ())
          (attributes (getf account :attributes)))
@@ -139,6 +150,10 @@
   (error 'unknown-command :oid (oid command)))
 
 (defmethod process-command ((command password-change) (client client))
+  ;; Let users change their own passwords
+  (when (or (null (account client))
+            (not (string-equal (cn-from-dn (user command)) (getf (account client) :name))))
+    (check-admin (account client)))
   (let ((account (authenticate (cn-from-dn (user command)) (pass command)))
         (pass (or (new-pass command) (generate-password))))
     (edit-account account :password pass)
