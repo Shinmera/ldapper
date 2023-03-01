@@ -3,10 +3,12 @@
   :build-pathname "ldapper"
   :entry-point "org.shirakumo.ldapper::main"
   :components ((:file "package")
+               (:file "conditions")
                (:file "database")
                (:file "ldif")
                (:file "ldap")
                (:file "commands")
+               (:file "results")
                (:file "protocol")
                (:file "server")
                (:file "config")

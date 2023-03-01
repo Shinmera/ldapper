@@ -1,8 +1,14 @@
 (in-package #:org.shirakumo.ldapper)
 
-(defclass command () ())
+(defclass message ()
+  ((client :initarg :client :accessor client)
+   (id :initarg :id :initform 0 :accessor id)))
+
+(defclass command (message)
+  ())
 
 (defgeneric tag (command))
+(defgeneric response-tag (command))
 
 (defmethod decode-object ((tag symbol) vec start end)
   (decode-object (make-instance tag) vec start end))
@@ -17,10 +23,15 @@
 (defmethod tag ((command command))
   (type-of command))
 
+(defmethod make-response ((command command) &rest args)
+  (apply #'make-instance (response-tag command) :client (client command) :id (id command) args))
+
 (defclass bind (command)
   ((version :initarg :version :initform 3 :accessor version) 
    (user :initarg :user :accessor user)
    (pass :initarg :pass :accessor pass)))
+
+(defmethod response-tag ((command bind)) 'bind-response)
 
 (defmethod decode-object ((command bind) vec start end)
   (with-decoding (version user pass) (vec start end)
@@ -41,10 +52,6 @@
   (let ((octets (babel:string-to-octets (pass command) :encoding :utf-8)))
     (encode-ber-length (length octets) vec)
     (vector-append-extend octets vec)))
-
-(defmethod decode-object ((tag (eql :pass)) vec start end)
-  (values 
-          end))
 
 (defclass unbind (command)
   ())
@@ -72,6 +79,8 @@
   ((domain-name :initarg :domain-name :accessor domain-name) 
    (attributes :initarg :attributes :initform () :accessor attributes)))
 
+(defmethod response-tag ((command add)) 'add-response)
+
 (defmethod decode-object ((command add) vec start end)
   (with-decoding (domain-name attributes) (vec start end)
     (setf (domain-name command) domain-name)
@@ -88,6 +97,8 @@
 (defclass del (command)
   ((domain-name :initarg :domain-name :accessor domain-name)))
 
+(defmethod response-tag ((command del)) 'del-response)
+
 (defmethod decode-object ((command del) vec start end)
   (setf (domain-name command) (babel:octets-to-string vec :start start :end end :encoding :utf-8)))
 
@@ -98,27 +109,31 @@
   ((domain-name :initarg :domain-name :accessor domain-name)
    (new-domain-name :initarg :new-domain-name :accessor new-domain-name)
    (delete-old-p :initarg :delete-old-p :initform T :accessor delete-old-p)
-   (new-sup :initarg :new-sup :initform NIL :accessor new-sup)))
+   (new-superior :initarg :new-superior :initform NIL :accessor new-superior)))
+
+(defmethod response-tag ((command moddn)) 'moddn-response)
 
 (defmethod decode-object ((command moddn) vec start end)
-  (with-decoding (domain-name new-domain-name delete-old-p &optional new-sup) (vec start end)
+  (with-decoding (domain-name new-domain-name delete-old-p &optional new-superior) (vec start end)
     (setf (domain-name command) domain-name)
     (setf (new-domain-name command) new-domain-name)
     (setf (delete-old-p command) delete-old-p)
-    (setf (new-sup command) new-sup)
+    (setf (new-superior command) new-superior)
     start))
 
 (defmethod encode-object ((command moddn) vec)
   (encode (domain-name command) vec)
   (encode (new-domain-name command) vec)
   (encode-boolean (delete-old-p command) vec)
-  (when (new-sup command)
-    (encode (new-sup command) vec)))
+  (when (new-superior command)
+    (encode (new-superior command) vec)))
 
 (defclass compare (command)
   ((domain-name :initarg :domain-name :accessor domain-name)
    (attribute :initarg :attribute :accessor attribute)
    (value :initarg :value :accessor value)))
+
+(defmethod response-tag ((command compare)) 'compare-response)
 
 (defmethod decode-object ((command compare) vec start end)
   (with-decoding (domain-name pair) (vec start end)
@@ -135,6 +150,8 @@
 (defclass modify (command)
   ((domain-name :initarg :domain-name :accessor domain-name) 
    (modifications :initarg :modifications :initform () :accessor modifications)))
+
+(defmethod response-tag ((command modify)) 'modify-response)
 
 (defmethod decode-object ((command modify) vec start end)
   (with-decoding (domain-name modifications) (vec start end)
@@ -167,6 +184,8 @@
    (attributes :initarg :attributes :initform () :accessor attributes)
    (paging-size :initarg :paging-size :initform NIL :accessor paging-size)
    (paging-cookie :initarg :paging-cookie :initform NIL :accessor paging-cookie)))
+
+(defmethod response-tag ((command lookup)) 'lookup-done)
 
 (defmethod decode-object ((command lookup) vec start end)
   (with-decoding (base scope deref size timestamp types-p filter attrs &optional controls) (vec start end)
@@ -272,6 +291,8 @@
   ((oid :initarg :oid :accessor oid)
    (value :initarg :value :initform NIL :accessor value)))
 
+(defmethod response-tag ((command extended)) 'extended-response)
+
 (defmethod decode-object ((command extended) vec start end)
   (with-decoding (oid &optional value) (vec start end)
     (setf (oid command) oid)
@@ -292,7 +313,7 @@
 (setf (oid-type "1.3.6.1.4.1.4203.1.11.1") 'password-change)
 
 (defmethod update-instance-for-different-class :after ((previous extended) (command password-change) &key)
-  (with-decoding (user pass new-pass) ((value command))
+  (with-decoding (user pass &optional new-pass) ((value command))
     (setf (user command) user)
     (setf (pass command) pass)
     (setf (new-pass command) new-pass)))

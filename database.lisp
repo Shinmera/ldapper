@@ -65,7 +65,7 @@
      account-ish)
     ((or string integer)
      (or (find-account account-ish)
-         (error "No account with name ~s found" account-ish)))))
+         (error 'no-such-account :name account-ish)))))
 
 (defun search-accounts (attribute value &key full)
   (macrolet ((query (&rest query)
@@ -97,7 +97,7 @@
   (let ((account (ensure-account account)))
     (if (crypto-shortcuts:check-rfc-2307-hash password (getf account :password))
         account
-        (error "Bad password."))))
+        (error 'authentication-failed :name (getf account :name)))))
 
 (defun make-account (name mail &key password real-name note classes attributes already-hashed)
   (connect)
@@ -159,5 +159,3 @@
       (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
       (postmodern:query (:delete-from 'accounts :where (:= 'id id)))
       account)))
-
-

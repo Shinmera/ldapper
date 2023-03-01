@@ -78,6 +78,34 @@
                               unless (find k ignored-attributes :test #'string-equal)
                               collect (list k v))))))
 
+(defun cn-from-dn (dn)
+  (cl-ppcre:register-groups-bind (cn full) ("^cn=([^,]+)|(.*)" dn)
+    (or cn full)))
+
+(defun account-dn (account &key (base-dn *base-dn*))
+  (format NIL "cn=~a~@[,~a~]" (getf account :name) base-dn))
+
+(defun attribute-key (attribute)
+  (cond ((or (string-equal "cn" attribute)
+             (string-equal "dn" attribute))
+         :name)
+        ((string-equal "mail" attribute)
+         :mail)
+        ((string-equal "userPassword" attribute)
+         :password)
+        ((or (string-equal "gecos" attribute)
+             (string-equal "displayName" attribute)
+             (string-equal "sn" attribute)
+             (string-equal "givenName" attribute))
+         :real-name)
+        ((string-equal "note" attribute)
+         :note)
+        ((or (string-equal "objectClass" attribute)
+             (string-equal "structuralObjectClass" attribute))
+         :classes)
+        (T
+         :attributes)))
+
 (defun account->ldif-record (account &key (output NIL) (base-dn *base-dn*))
   (etypecase output
     (null
