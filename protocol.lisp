@@ -38,6 +38,8 @@
                   (call-next-method))
     (ldapper-error (e)
       (reply command :code (code e) :message (princ-to-string e)))
+    (cl-postgres-error:unique-violation (e)
+      (reply command :code :entry-already-exists :message (princ-to-string e)))
     (error (e)
       (reply command :code :operations-error :message (princ-to-string e))
       (close client))))
