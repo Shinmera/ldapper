@@ -6,6 +6,12 @@
 
 (in-package #:org.shirakumo.ldapper)
 
+(defmacro define-simple-print (class &rest slots)
+  `(defmethod print-object ((object ,class) stream)
+     (print-unreadable-object (object stream :type T)
+       (format stream ,(format NIL "~{~a: ~~s~^ ~}" slots)
+               ,@(loop for slot in slots collect `(slot-value object ',slot))))))
+
 (defclass message ()
   ((client :initarg :client :accessor client)
    (id :initarg :id :initform 0 :accessor id)))
@@ -36,6 +42,8 @@
   ((version :initarg :version :initform 3 :accessor version) 
    (user :initarg :user :accessor user)
    (pass :initarg :pass :accessor pass)))
+
+(define-simple-print bind version user)
 
 (defmethod response-tag ((command bind)) 'bind-response)
 
@@ -80,6 +88,8 @@
   ((domain-name :initarg :domain-name :accessor domain-name) 
    (attributes :initarg :attributes :initform () :accessor attributes)))
 
+(define-simple-print add domain-name attributes)
+
 (defmethod response-tag ((command add)) 'add-response)
 
 (defmethod decode-object ((command add) vec start end)
@@ -98,6 +108,8 @@
 (defclass del (command)
   ((domain-name :initarg :domain-name :accessor domain-name)))
 
+(define-simple-print del domain-name)
+
 (defmethod response-tag ((command del)) 'del-response)
 
 (defmethod decode-object ((command del) vec start end)
@@ -111,6 +123,8 @@
    (new-domain-name :initarg :new-domain-name :accessor new-domain-name)
    (delete-old-p :initarg :delete-old-p :initform T :accessor delete-old-p)
    (new-superior :initarg :new-superior :initform NIL :accessor new-superior)))
+
+(define-simple-print moddn domain-name new-domain-name)
 
 (defmethod response-tag ((command moddn)) 'moddn-response)
 
@@ -134,6 +148,8 @@
    (attribute :initarg :attribute :accessor attribute)
    (value :initarg :value :accessor value)))
 
+(define-simple-print compare domain-name attribute value)
+
 (defmethod response-tag ((command compare)) 'compare-response)
 
 (defmethod decode-object ((command compare) vec start end)
@@ -151,6 +167,8 @@
 (defclass modify (command)
   ((domain-name :initarg :domain-name :accessor domain-name) 
    (modifications :initarg :modifications :initform () :accessor modifications)))
+
+(define-simple-print modify domain-name modifications)
 
 (defmethod response-tag ((command modify)) 'modify-response)
 
@@ -185,6 +203,8 @@
    (attributes :initarg :attributes :initform () :accessor attributes)
    (paging-size :initarg :paging-size :initform NIL :accessor paging-size)
    (paging-cookie :initarg :paging-cookie :initform NIL :accessor paging-cookie)))
+
+(define-simple-print lookup filter)
 
 (defmethod response-tag ((command lookup)) 'lookup-done)
 
@@ -295,6 +315,8 @@
   ((oid :initarg :oid :accessor oid)
    (value :initarg :value :initform NIL :accessor value)))
 
+(define-simple-print extended oid)
+
 (defmethod response-tag ((command extended)) 'extended-response)
 
 (defmethod decode-object ((command extended) vec start end)
@@ -319,6 +341,8 @@
    (new-pass :initarg :new-pass :accessor new-pass)))
 
 (setf (oid-type "1.3.6.1.4.1.4203.1.11.1") 'password-change)
+
+(define-simple-print password-change user)
 
 (defmethod update-instance-for-different-class :after ((previous extended) (command password-change) &key)
   (let ((start 0) (vec (value command)))
