@@ -157,3 +157,7 @@ Then from environment variables
     (error (e)
       (v:error :ldapper "Error: ~a" e)
       (sb-ext:exit :code 1))))
+
+(pushnew #'v:remove-global-controller uiop:*image-dump-hook*)
+(pushnew #'v:restart-global-controller uiop:*image-restore-hook*)
+
