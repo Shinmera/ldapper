@@ -22,7 +22,7 @@ And that's it. Your LDAP server is up and running! To add new user accounts, you
 ldapper add MyAccount whatever@example.com
 ::
 
-You can also mass import accounts from an ldif file:
+You can also mass import accounts from an ldif file or the current OpenLDAP database:
 
 ::
 ldapper import accounts.ldif
