@@ -61,7 +61,7 @@
              (cdr (assoc name record :test #'string-equal))))
       (list :id NIL
             :name (field "cn")
-            :mail (field "mail")
+            :mail (or (field "mail") "")
             :password (field "userPassword")
             :real-name (or (when (and (field "givenName") (field "sn"))
                              (format NIL "~@[~a ~]~@[~a~]" (field "givenName") (field "sn")))

@@ -41,7 +41,7 @@
 
 (defmethod process-command ((command add) (client client))
   (let* ((record (list* (cons "cn" (cn-from-dn (domain-name command))) (attributes command)))
-         (account (insert-account (ldif-record->account record))))
+         (account (insert-account (ldap-record->account record))))
     (reply command :domain-name (account-dn account))))
 
 (defmethod process-command ((command del) (client client))
