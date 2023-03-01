@@ -16,10 +16,12 @@
 
 (defun connect ()
   (unless (and postmodern:*database* (postmodern:connected-p postmodern:*database*))
+    (v:info :ldapper "Connecting to ~a/~a" *postgres-host* *postgres-db*)
     (postmodern:connect-toplevel *postgres-db* *postgres-user* *postgres-pass* *postgres-host*)))
 
 (defun disconnect ()
   (when (and postmodern:*database* (postmodern:connected-p postmodern:*database*))
+    (v:info :ldapper "Disconnecting")
     (postmodern:disconnect-toplevel)))
 
 (defun init-database ()

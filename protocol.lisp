@@ -2,31 +2,31 @@
 
 (defmethod send ((message message))
   (let ((stream (socket-stream (client message))))
-    (write-sequence (encode-message message) stream)))
+    (write-sequence (encode-message message) stream)
+    (finish-output stream)))
 
 (defmethod reply ((command command) &rest args)
   (send (apply #'make-response command args)))
 
 (defun read-command (stream)
+  (assert (= 48 (read-byte stream)))
   (let* ((length (read-ber-length stream))
          (buf (make-array length :element-type '(unsigned-byte 8))))
-    (decode-message (read-sequence buf stream))))
+    (read-sequence buf stream)
+    (decode-message buf)))
 
 (defgeneric process-command (command client))
 
 (defmethod process-command :around ((command command) (client client))
-  (handler-case (handler-bind ((error (lambda (e) (v:warn :ldapper e))))
+  (v:trace :ldapper "~a Processing ~a" client command)
+  (setf (client command) client)
+  (handler-case (handler-bind (((and error (not ldapper-error))
+                                 (lambda (e) (v:warn :ldapper e))))
                   (call-next-method))
-    (no-such-account (e)
-      (reply command :code :no-such-object :message (princ-to-string e)))
-    (authentication-failed (e)
-      (reply command :code :invalid-credentials :message (princ-to-string e)))
-    (permission-denied (e)
-      (reply command :code :insufficient-access-rights :message (princ-to-string e)))
-    (attribute-required (e)
-      (reply command :code :constraint-violation :message (princ-to-string e)))
-    (error ()
-      (reply command :code :operations-error)
+    (ldapper-error (e)
+      (reply command :code (code e) :message (princ-to-string e)))
+    (error (e)
+      (reply command :code :operations-error :message (princ-to-string e))
       (close client))))
 
 (defmethod process-command ((command bind) (client client))
@@ -132,7 +132,7 @@
   (send client))
 
 (defmethod process-command ((command extended) (client client))
-  (error "Unknown command"))
+  (error 'unknown-command :oid (oid command)))
 
 (defmethod process-command ((command password-change) (client client))
   (let ((account (authenticate (cn-from-dn (user command)) (pass command)))

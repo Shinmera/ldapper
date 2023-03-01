@@ -16,11 +16,13 @@
           ((or ssl-certificate ssl-certificate-key)
            (error "Need both ssl-certificate and ssl-certificate-key")))
     (v:info :ldapper "Listening on ~a:~a~@[ SSL~*~]" host port ssl-certificate)
-    (setf (socket listener) (usocket:socket-listen host port :reuse-address T :element-type '(unsigned-byte 8)))))
+    (setf (socket listener) (usocket:socket-listen host port :reuse-address T :element-type '(unsigned-byte 8)))
+    listener))
 
 (defmethod close ((listener listener) &key abort)
+  (declare (ignore abort))
   (when (socket listener)
-    (close (socket listener) :abort abort)
+    (usocket:socket-close (socket listener))
     (setf (socket listener) NIL))
   (when (context listener)
     (cl+ssl:ssl-ctx-free (context listener))
@@ -35,15 +37,24 @@
 (defmethod initialize-instance :after ((client client) &key socket)
   (setf (socket-stream client) (usocket:socket-stream socket)))
 
+(defmethod print-object ((client client) stream)
+  (print-unreadable-object (client stream :type T)
+    (let ((socket (socket client)))
+      (if socket
+          (handler-case (format stream "~a" (usocket:get-peer-name socket))
+            (error () (format stream "CLOSING")))
+          (format stream "CLOSED")))))
+
 (defmethod accept ((listener listener))
-  (v:debug :ldapper "Accepting new connection on ~a" listener)
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
+    (v:debug :ldapper "Accepting new connection on ~a" (usocket:get-peer-name socket))
     (if (context listener)
         (make-instance 'ssl-client :socket socket :context (context listener))
         (make-instance 'client :socket socket))))
 
 (defmethod close ((client client) &key abort)
   (when (socket-stream client)
+    (v:debug :ldapper "~a Closing connection" client)
     (close (socket-stream client) :abort abort)
     (setf (socket-stream client) NIL))
   (when (socket client)
@@ -66,7 +77,7 @@
          (init-database)
          (v:info :ldapper "Starting server")
          (unless lparallel:*kernel*
-           (setf lparallel:*kernel* (lparallel:make-kernel workers :name 'ldapper-clients)))
+           (setf lparallel:*kernel* (lparallel:make-kernel workers :name "ldapper-clients")))
          (dolist (server (if servers-p servers *ldap-servers*))
            (push (apply #'start-listener server) *listeners*))
          (acceptor-loop))
@@ -88,5 +99,11 @@
                  do (lparallel:submit-task (channel client) #'serve client))))
 
 (defmethod serve ((client client))
-  (loop while (open-stream-p (socket-stream client))
-        do (process-command (read-command (socket-stream client)) client)))
+  (restart-case
+      (handler-bind ((end-of-file #'abort))
+        (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
+              for command = (read-command (socket-stream client))
+              do (process-command command client)))
+    (abort ()
+      :report "Disconnect the client."
+      (close client))))

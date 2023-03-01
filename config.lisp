@@ -14,8 +14,8 @@
                      ((string-equal k "ssl-key") (setf ssl-key v))
                      ((string-equal k "ssl-pass") (setf ssl-pass v))
                      (T (error "Bad LISTEN argument: ~s" k))))
-      (list host (parse-integer port) :ssl-certificate (merge-pathnames ssl-cert file)
-                                      :ssl-certificate-key (merge-pathnames ssl-key file)
+      (list host (parse-integer port) :ssl-certificate (when ssl-cert (merge-pathnames ssl-cert file))
+                                      :ssl-certificate-key (when ssl-key (merge-pathnames ssl-key file))
                                       :ssl-certificate-password ssl-pass))))
 
 (defun read-config-file (file)

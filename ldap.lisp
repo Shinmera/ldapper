@@ -318,6 +318,18 @@
     (dolist (part parts vec)
       (encode part vec))))
 
+(defun decode-string (vec &optional (start 0))
+  (multiple-value-bind (length start) (decode-ber-length vec start)
+    (values (babel:octets-to-string vec :start start :end (+ start length) :encoding :latin-1)
+            (+ start length))))
+
+(defun check-ber-tag (vec start class p/c id)
+  (multiple-value-bind (actual-class actual-p/c actual-id start) (decode-ber-tag vec start)
+    (assert (eql actual-class class))
+    (assert (eql actual-p/c p/c))
+    (assert (= actual-id id))
+    start))
+
 (defgeneric decode-object (object vec start end))
 
 (defun decode (vec &optional (start 0))
@@ -353,11 +365,13 @@
          ,@body))))
 
 (defun encode-message (object)
-  (encode (encode* (id object) (encode object))))
+  (let ((vec (vec)))
+    (encode (id object) vec)
+    (encode object vec)
+    (encode vec)))
 
 (defun decode-message (vec &optional (start 0))
-  (multiple-value-bind (message start) (decode vec start)
-    (multiple-value-bind (id off) (decode message)
-      (let ((message (decode message off)))
-        (setf (id message) id)
-        (values message start)))))
+  (multiple-value-bind (id off) (decode vec start)
+    (let ((message (decode vec off)))
+      (setf (id message) id)
+      (values message start))))

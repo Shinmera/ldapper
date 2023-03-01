@@ -9,8 +9,8 @@
                (:file "ldap")
                (:file "commands")
                (:file "results")
-               (:file "protocol")
                (:file "server")
+               (:file "protocol")
                (:file "config")
                (:file "main"))
   :depends-on (:usocket
