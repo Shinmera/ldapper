@@ -114,7 +114,8 @@
 
 (defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn)
   (let ((account (ensure-account account))
-        (record ()))
+        (record ())
+        (tmp (make-hash-table :test 'equal)))
     (unless skip-dn
       (push (list "dn" (account-dn account :base-dn base-dn)) record))
     (push (list* "objectClass" (getf account :classes)) record)
@@ -124,8 +125,11 @@
       (push (list "userPassword" (base64:string-to-base64-string (getf account :password))) record))
     (push (list "displayName" (getf account :real-name)) record)
     (push (list "note" (getf account :note)) record)
-    (append (nreverse record)
-            (getf account :attributes))))
+    (loop for (key . vals) in (getf account :attributes)
+          do (setf (gethash key tmp) (append vals (gethash key tmp))))
+    (loop for key being the hash-keys of tmp using (hash-value vals)
+          do (push (list* key vals) record))
+    (nreverse record)))
 
 (defun account->ldif-text (account &rest args &key (output NIL) (base-dn *base-dn*) trusted)
   (etypecase output
