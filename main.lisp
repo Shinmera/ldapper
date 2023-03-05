@@ -23,7 +23,7 @@
                                 ((string-equal key "--require") (push val (getf add-args :required-attributes)))
                                 ((string-equal key "--ignore") (push val (getf add-args :ignored-attributes)))
                                 (T (error "Unknown key argument ~a" key))))
-                 (let ((accounts (apply #'import-from-ldif file add-args)))
+                 (let ((accounts (apply #'import-from-ldif (uiop:parse-native-namestring file) add-args)))
                    (dolist (account accounts) (account->ldif-text account :output *standard-output* :trusted T)))))
               ((string-equal command "add")
                (let ((add-args ()) (name (pop args)) (mail (pop args)))
@@ -62,6 +62,7 @@
                                 ((string-equal key "--start") (setf start (string-equal val "true")))
                                 ((string-equal key "--enable") (setf enable (string-equal val "true")))
                                 (T (error "Unknown key argument ~a" key))))
+                 (connect)
                  (v:info :ldapper "Installing ~a" unit)
                  (with-open-file (stream (format NIL "/etc/systemd/system/~a.service" unit) :direction :output)
                    (format stream "[Unit]
