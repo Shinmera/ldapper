@@ -27,7 +27,7 @@
 (define-condition permission-denied (ldapper-error)
   ((name :initarg :name :reader name))
   (:report (lambda (c s) (format s "~s is not permitted to perform this action."
-                                 (getf (name c) :name "Anonymous")))))
+                                 (name c)))))
 
 (defmethod code ((condition permission-denied)) :insufficient-access-rights)
 

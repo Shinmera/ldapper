@@ -111,7 +111,8 @@
 
 (defmethod serve ((client client))
   (restart-case
-      (handler-bind (((or stream-error usocket:socket-error) #'abort))
+      (handler-bind (((or stream-error usocket:socket-error) #'abort)
+                     (error (lambda (e) (v:severe :ldapper e) (abort))))
         (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
               do (unless (nth-value 1 (usocket:wait-for-input (socket client) :timeout 10.0))
                    (error 'usocket:timeout-error :socket (socket client)))
