@@ -7,6 +7,7 @@
 (in-package #:org.shirakumo.ldapper)
 
 (defun main ()
+  (v:output-here *error-output*)
   (read-config)
   (handler-case
       (destructuring-bind (self &optional (command "help") &rest args) sb-ext:*posix-argv*
@@ -25,6 +26,10 @@
                                 (T (error "Unknown key argument ~a" key))))
                  (let ((accounts (apply #'import-from-ldif (uiop:parse-native-namestring file) add-args)))
                    (dolist (account accounts) (account->ldif-text account :output *standard-output* :trusted T)))))
+              ((string-equal command "show")
+               (let ((name (pop args)))
+                 (unless name (error "NAME required"))
+                 (account->ldif-text (ensure-account name) :output *standard-output* :trusted T)))
               ((string-equal command "add")
                (let ((add-args ()) (name (pop args)) (mail (pop args)))
                  (unless name (error "NAME required"))
@@ -36,8 +41,8 @@
                                 ((string-equal key "--class") (push val (getf add-args :classes)))
                                 ((string-equal key "--attribute") (push (cl-ppcre:split "=" val :limit 2) (getf add-args :attributes)))
                                 (T (error "Unknown key argument ~a" key))))
-                 (let ((peer (apply #'make-account name mail add-args)))
-                   (format *standard-output* "~{~a: ~a~%~}" peer))))
+                 (let ((account (apply #'make-account name mail add-args)))
+                   (account->ldif-text account :output *standard-output* :trusted T))))
               ((string-equal command "remove")
                (delete-account (or (first args) (error "NAME required"))))
               ((string-equal command "passwd")
@@ -92,6 +97,8 @@ Command can be:
   start  --- Start the ldap server
   stop   --- Stop the ldap server
   list   --- List known accounts in LDIF format
+  show   --- Show the information about an account
+    NAME                 --- The name of the account
   import --- Import accounts from an LDIF file
     FILE                 --- The path of the LDIF file to import.
     --dry-run BOOLEAN    --- Whether to print the results only. [true]
@@ -154,9 +161,11 @@ Then from environment variables
               (T (error "Unknown command ~s" command))))
     (sb-sys:interactive-interrupt ()
       (v:info :ldapper "Exiting from interrupt")
+      (v:sync)
       (sb-ext:exit :code 0))
     (error (e)
       (v:error :ldapper "Error: ~a" e)
+      (v:sync)
       (sb-ext:exit :code 1))))
 
 (pushnew #'v:remove-global-controller uiop:*image-dump-hook*)

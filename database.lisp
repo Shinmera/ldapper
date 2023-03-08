@@ -198,7 +198,7 @@
                                               'password (if password
                                                             (if already-hashed password (cryptos:rfc-2307-hash password))
                                                             "")
-                                              'real-name real-name
+                                              'real-name (or real-name "")
                                               'note (or note "")
                                               :returning 'id)
                                 :single)))
@@ -228,15 +228,17 @@
         (when password (update :password 'password (if already-hashed password (cryptos:rfc-2307-hash password)))))
       (when classes-p
         (postmodern:query (:delete-from 'classes :where (:= 'account id)))
-        (postmodern:query (:insert-rows-into 'classes :columns 'account 'class
-                                             :values (loop for class in classes
-                                                           collect (list id class))))
+        (when classes
+          (postmodern:query (:insert-rows-into 'classes :columns 'account 'class
+                                               :values (loop for class in classes
+                                                             collect (list id class)))))
         (setf (getf account :classes) classes))
       (when attributes-p
         (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
-        (postmodern:query (:insert-rows-into 'attributes :columns 'account 'key 'value
-                           :values (loop for (key val) in attributes
-                                         collect (list id key val))))
+        (when attributes
+          (postmodern:query (:insert-rows-into 'attributes :columns 'account 'key 'value
+                             :values (loop for (key val) in attributes
+                                           collect (list id key val)))))
         (setf (getf account :attributes) attributes))
       account)))
 
