@@ -33,6 +33,7 @@
                    ((string-equal var "LDAPPER_POSTGRES_DB") (setf *postgres-db* val))
                    ((string-equal var "LDAPPER_BASE_DN") (setf *base-dn* val))
                    ((string-equal var "LDAPPER_WORKERS") (setf *workers* (parse-integer val)))
+                   ((string-equal var "LDAPPER_CONNECTION_TIMEOUT") (setf *connection-timeout* (parse-integer val)))
                    ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen))
                    ((string-equal var "LDAPPER_USER") (setf *user-id* val))
                    ((string-equal var "LDAPPER_GROUP") (setf *group-id* val))
@@ -66,6 +67,7 @@
     (maybe-set *user-id* "LDAPPER_USER")
     (maybe-set *group-id* "LDAPPER_GROUP")
     (maybe-set *workers* "LDAPPER_WORKERS" parse-integer)
+    (maybe-set *connection-timeout* "LDAPPER_CONNECTION_TIMEOUT" parse-integer)
     (let ((val (envvar "LDAPPER_LOG_LEVEL")))
       (when val
         (setf (v:repl-level) (cond ((string-equal "trace" val) :trace)

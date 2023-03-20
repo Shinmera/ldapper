@@ -148,6 +148,9 @@ The following configuration variables exist:
   LDAPPER_WORKERS             --- The number of worker threads to
                                   spawn. Limits the concurrent users.
                                   [20]
+  LDAPPER_CONNECTION_TIMEOUT  --- Number of seconds to wait for input
+                                  from a client before timing it out
+                                  [300]
   LDAPPER_USER                --- The user name to drop privileges to
   LDAPPER_GROUP               --- The group name to drop privileges to
   LDAPPER_LOG_LEVEL           --- The logging level to use. Can be:
