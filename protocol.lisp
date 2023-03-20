@@ -45,8 +45,11 @@
       (close client))))
 
 (defmethod process-command ((command bind) (client client))
-  (setf (account client) (authenticate (cn-from-dn (user command)) (pass command)))
-  (reply command :domain-name (account-dn (account client))))
+  (cond ((string/= "" (user command))
+         (setf (account client) (authenticate (cn-from-dn (user command)) (pass command)))
+         (reply command :domain-name (account-dn (account client))))
+        (T
+         (reply command))))
 
 (defmethod process-command ((command unbind) (client client))
   (setf (account client) NIL))
