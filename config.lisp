@@ -35,7 +35,15 @@
                    ((string-equal var "LDAPPER_WORKERS") (setf *workers* (parse-integer val)))
                    ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen))
                    ((string-equal var "LDAPPER_USER") (setf *user-id* val))
-                   ((string-equal var "LDAPPER_GROUP") (setf *group-id* val)))))
+                   ((string-equal var "LDAPPER_GROUP") (setf *group-id* val))
+                   ((string-equal var "LDAPPER_LOG_LEVEL")
+                    (setf (v:repl-level) (cond ((string-equal "trace" val) :trace)
+                                               ((string-equal "debug" val) :debug)
+                                               ((string-equal "info" val) :info)
+                                               ((string-equal "warn" val) :warn)
+                                               ((string-equal "error" val) :error)
+                                               ((string-equal "severe" val) :severe)
+                                               (T (v:repl-level))))))))
       (with-open-file (stream file :if-does-not-exist NIL)
         (when stream
           (loop for line = (read-line stream NIL NIL)
@@ -58,9 +66,18 @@
     (maybe-set *user-id* "LDAPPER_USER")
     (maybe-set *group-id* "LDAPPER_GROUP")
     (maybe-set *workers* "LDAPPER_WORKERS" parse-integer)
-    (let ((listen (envvar "LDAPPER_LISTEN")))
-      (when listen
-        (setf *ldap-servers* (list (parse-listen-config listen)))))))
+    (let ((val (envvar "LDAPPER_LOG_LEVEL")))
+      (when val
+        (setf (v:repl-level) (cond ((string-equal "trace" val) :trace)
+                                   ((string-equal "debug" val) :debug)
+                                   ((string-equal "info" val) :info)
+                                   ((string-equal "warn" val) :warn)
+                                   ((string-equal "error" val) :error)
+                                   ((string-equal "severe" val) :severe)
+                                   (T (v:repl-level))))))
+    (let ((val (envvar "LDAPPER_LISTEN")))
+      (when val
+        (setf *ldap-servers* (list (parse-listen-config val)))))))
 
 (defun read-config ()
   (read-config-file "/etc/default/ldapper")

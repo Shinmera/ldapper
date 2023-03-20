@@ -150,6 +150,8 @@ The following configuration variables exist:
                                   [20]
   LDAPPER_USER                --- The user name to drop privileges to
   LDAPPER_GROUP               --- The group name to drop privileges to
+  LDAPPER_LOG_LEVEL           --- The logging level to use. Can be:
+    trace, debug, info, warn, error, severe
   LDAPPER_LISTEN              --- Can be specified multiple times to
                                   specify servers must be in the
                                   following format, where FILE may be
