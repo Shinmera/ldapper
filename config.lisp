@@ -33,7 +33,9 @@
                    ((string-equal var "LDAPPER_POSTGRES_DB") (setf *postgres-db* val))
                    ((string-equal var "LDAPPER_BASE_DN") (setf *base-dn* val))
                    ((string-equal var "LDAPPER_WORKERS") (setf *workers* (parse-integer val)))
-                   ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen)))))
+                   ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen))
+                   ((string-equal var "LDAPPER_USER") (setf *user-id* val))
+                   ((string-equal var "LDAPPER_GROUP") (setf *group-id* val)))))
       (with-open-file (stream file :if-does-not-exist NIL)
         (when stream
           (loop for line = (read-line stream NIL NIL)
@@ -53,6 +55,8 @@
     (maybe-set *postgres-pass* "LDAPPER_POSTGRES_PASS")
     (maybe-set *postgres-db* "LDAPPER_POSTGRES_DB")
     (maybe-set *base-dn* "LDAPPER_BASE_DN")
+    (maybe-set *user-id* "LDAPPER_USER")
+    (maybe-set *group-id* "LDAPPER_GROUP")
     (maybe-set *workers* "LDAPPER_WORKERS" parse-integer)
     (let ((listen (envvar "LDAPPER_LISTEN")))
       (when listen

@@ -9,9 +9,23 @@
 (defvar *base-dn* NIL)
 (defvar *ldap-servers* '(("0.0.0.0" 389)
                          ("0.0.0.0" 636 :ssl-certificate "ldapper-chain.pem" :ssl-certificate-key "ldapper-key.pem")))
+(defvar *user-id* NIL)
+(defvar *group-id* NIL)
 (defvar *workers* 20)
 (defvar *listeners* ())
 (defvar *thread* NIL)
+
+(defun lower-privileges (user group)
+  #+sbcl
+  (etypecase group
+    (null)
+    (integer (sb-posix:setgid group))
+    (string (sb-posix:setgid (sb-posix:group-gid (sb-posix:getgrnam group)))))
+  #+sbcl
+  (etypecase user
+    (null)
+    (integer (sb-posix:setuid user))
+    (string (sb-posix:setuid (sb-posix:passwd-uid (sb-posix:getpwnam user))))))
 
 (defclass listener ()
   ((socket :initform NIL :accessor socket)
@@ -88,6 +102,8 @@
            (setf lparallel:*kernel* (lparallel:make-kernel workers :name "ldapper-clients")))
          (dolist (server (if servers-p servers *ldap-servers*))
            (push (apply #'start-listener server) *listeners*))
+         (when (= 0 (sb-posix:getuid))
+           (lower-privileges *user-id* *group-id*))
          (acceptor-loop))
     (stop)))
 

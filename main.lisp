@@ -10,7 +10,7 @@
   (v:output-here *error-output*)
   (read-config)
   (handler-case
-      (destructuring-bind (self &optional (command "help") &rest args) sb-ext:*posix-argv*
+      (destructuring-bind (self &optional (command "help") &rest args) (uiop:raw-command-line-arguments)
         (cond ((string-equal command "start")
                (start))
               ((string-equal command "stop")
@@ -148,6 +148,8 @@ The following configuration variables exist:
   LDAPPER_WORKERS             --- The number of worker threads to
                                   spawn. Limits the concurrent users.
                                   [20]
+  LDAPPER_USER                --- The user name to drop privileges to
+  LDAPPER_GROUP               --- The group name to drop privileges to
   LDAPPER_LISTEN              --- Can be specified multiple times to
                                   specify servers must be in the
                                   following format, where FILE may be
@@ -159,6 +161,7 @@ Then from $HOME/.config/ldapper/config
 Then from environment variables
 " self))
               (T (error "Unknown command ~s" command))))
+    #+sbcl
     (sb-sys:interactive-interrupt ()
       (v:info :ldapper "Exiting from interrupt")
       (v:sync)
