@@ -123,6 +123,12 @@
                     (:delete
                      (when (or (null vals) (find (getf key args) vals :test #'string=))
                        (setf (getf key args) "")))))
+                 (:password
+                  (ecase type
+                    (:replace
+                     (setf (getf key args) (base64:base64-string-to-string (or (first vals) ""))))
+                    (:delete
+                     (setf (getf key args) ""))))
                  (:classes
                   (ecase type
                     (:add
