@@ -2,7 +2,7 @@
 This is a //very// simple implementation of an LDAP server, backed by a Postgres database. If you're fed up with the complicated mess that is OpenLDAP or ActiveDirectory, and just need a simple accounts database that can be accessed from other services, this is for you!
 
 ## How To
-Compile a binary for ldapper with ``sbcl --eval (asdf:make :ldapper)``, which should give you an ``ldapper`` binary.
+Compile a binary for ldapper with ``sbcl --eval (asdf:make :ldapper)``, or download one from the "releases"(https://github.com/Shinmera/ldapper/releases/latest).
 
 Before you do anything else, please read the help documentation with the supported options and parameters thoroughly:
 
