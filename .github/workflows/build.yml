@@ -1,0 +1,36 @@
+name: build
+permissions:
+  contents: write
+on:
+  push:
+    tags:
+      - "v*.*.*"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install env
+        run: |
+          sudo apt-get -qq install sbcl
+          curl -o ~/quicklisp.lisp https://beta.quicklisp.org/quicklisp.lisp
+          sbcl --load ~/quicklisp.lisp --eval '(quicklisp-quickstart:install)' --non-interactive
+      - uses: actions/checkout@v1
+      - name: Build the library
+        run: |
+          sbcl --noinform \
+               --eval '(load "/home/runner/quicklisp/setup.lisp")' \
+               --eval '(asdf:load-asd "/home/runner/work/ldapper/ldapper/ldapper.asd")' \
+               --eval '(ql:quickload :ldapper)' \
+               --non-interactive
+      - name: Build the binary
+        run: |
+          sbcl --noinform \
+               --eval '(load "/home/runner/quicklisp/setup.lisp")' \
+               --eval '(asdf:load-asd "/home/runner/work/ldapper/ldapper/ldapper.asd")' \
+               --eval '(asdf:make :ldapper)' \
+               --non-interactive
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          append_body: true
+          files: ldapper
