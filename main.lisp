@@ -7,6 +7,8 @@
 (in-package #:org.shirakumo.ldapper)
 
 (defun main ()
+  (setf *print-right-margin* most-positive-fixnum)
+  (v:restart-global-controller)
   (v:output-here *error-output*)
   (read-config)
   (handler-case
@@ -177,5 +179,3 @@ Then from environment variables
       (sb-ext:exit :code 1))))
 
 (pushnew #'v:remove-global-controller uiop:*image-dump-hook*)
-(pushnew #'v:restart-global-controller uiop:*image-restore-hook*)
-
