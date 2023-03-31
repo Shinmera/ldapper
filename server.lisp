@@ -129,16 +129,19 @@
       :report "Exit the acceptor loop")))
 
 (defmethod serve ((client client))
-  (restart-case
-      (handler-bind (((or stream-error usocket:socket-error) #'abort)
-                     (error (lambda (e) (v:severe :ldapper e) (abort))))
-        (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
-              do (unless (nth-value 1 (usocket:wait-for-input (socket client) :timeout *connection-timeout*))
-                   (error 'usocket:timeout-error :socket (socket client)))
-                 (process-command (read-command (socket-stream client)) client)))
-    (abort ()
-      :report "Disconnect the client."
-      (close client))))
+  (let ((postmodern:*database* NIL))
+    (unwind-protect
+         (restart-case
+             (handler-bind (((or stream-error usocket:socket-error) #'abort)
+                            (error (lambda (e) (v:severe :ldapper e) (abort))))
+               (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
+                     do (unless (nth-value 1 (usocket:wait-for-input (socket client) :timeout *connection-timeout*))
+                          (error 'usocket:timeout-error :socket (socket client)))
+                        (process-command (read-command (socket-stream client)) client)))
+           (abort ()
+             :report "Disconnect the client."
+             (close client)))
+      (disconnect))))
 
 (defun start-threaded ()
   (when (and *thread* (bt:thread-alive-p *thread*))
