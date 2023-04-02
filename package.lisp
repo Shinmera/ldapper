@@ -6,6 +6,7 @@
 
 (defpackage #:org.shirakumo.ldapper
   (:use #:cl)
+  (:local-nicknames (#:v #:org.shirakumo.verbose))
   ;; conditions.lisp
   (:export
    #:ldapper-condition
