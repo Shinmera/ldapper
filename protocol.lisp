@@ -129,7 +129,8 @@
                  (:password
                   (ecase type
                     ((:add :replace)
-                     (setf (getf args key) (base64:base64-string-to-string (or (first vals) ""))))
+                     (setf (getf args key) (base64:base64-string-to-string (or (first vals) "")))
+                     (setf (getf args :already-hashed) T))
                     (:delete
                      (setf (getf args key) ""))))
                  (:classes
