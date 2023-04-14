@@ -115,7 +115,7 @@
 (defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn)
   (let ((account (ensure-account account))
         (record ())
-        (tmp (make-hash-table :test 'equal)))
+        (tmp (make-hash-table :test 'equalp)))
     (unless skip-dn
       (push (list "dn" (account-dn account :base-dn base-dn)) record))
     (push (list* "objectClass" (getf account :classes)) record)
