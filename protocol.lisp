@@ -108,12 +108,15 @@
             do (ecase key
                  (:name
                   (ecase type
-                    (:replace
-                     (setf (getf key args) (cn-from-dn (or (first vals) (error 'attribute-required :attribute "cn")))))))
+                    ((:add :replace)
+                     (setf (getf key args) (cn-from-dn (or (first vals) (error 'attribute-required :attribute "cn")))))
+                    (:delete)))
                  (:mail
                   (ecase type
-                    (:replace
-                     (setf (getf key args) (or (first vals) (error 'attribute-required :attribute "mail"))))))
+                    ((:add :replace)
+                     (setf (getf key args) (or (first vals) (error 'attribute-required :attribute "mail"))))
+                    (:delete
+                     (setf (getf key args) ""))))
                  ((:note :real-name)
                   (ecase type
                     (:add
@@ -125,7 +128,7 @@
                        (setf (getf key args) "")))))
                  (:password
                   (ecase type
-                    (:replace
+                    ((:add :replace)
                      (setf (getf key args) (base64:base64-string-to-string (or (first vals) ""))))
                     (:delete
                      (setf (getf key args) ""))))
