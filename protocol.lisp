@@ -109,37 +109,37 @@
                  (:name
                   (ecase type
                     ((:add :replace)
-                     (setf (getf key args) (cn-from-dn (or (first vals) (error 'attribute-required :attribute "cn")))))
+                     (setf (getf args key) (cn-from-dn (or (first vals) (error 'attribute-required :attribute "cn")))))
                     (:delete)))
                  (:mail
                   (ecase type
                     ((:add :replace)
-                     (setf (getf key args) (or (first vals) (error 'attribute-required :attribute "mail"))))
+                     (setf (getf args key) (or (first vals) (error 'attribute-required :attribute "mail"))))
                     (:delete
-                     (setf (getf key args) ""))))
+                     (setf (getf args key) ""))))
                  ((:note :real-name)
                   (ecase type
                     (:add
-                     (setf (getf key args) (or (first vals) "")))
+                     (setf (getf args key) (or (first vals) "")))
                     (:replace
-                     (setf (getf key args) (or (first vals) "")))
+                     (setf (getf args key) (or (first vals) "")))
                     (:delete
-                     (when (or (null vals) (find (getf key args) vals :test #'string=))
-                       (setf (getf key args) "")))))
+                     (when (or (null vals) (find (getf args key) vals :test #'string=))
+                       (setf (getf args key) "")))))
                  (:password
                   (ecase type
                     ((:add :replace)
-                     (setf (getf key args) (base64:base64-string-to-string (or (first vals) ""))))
+                     (setf (getf args key) (base64:base64-string-to-string (or (first vals) ""))))
                     (:delete
-                     (setf (getf key args) ""))))
+                     (setf (getf args key) ""))))
                  (:classes
                   (ecase type
                     (:add
-                     (setf (getf key args) (append (getf key args) vals)))
+                     (setf (getf args key) (append (getf args key) vals)))
                     (:replace
-                     (setf (getf key args) vals))
+                     (setf (getf args key) vals))
                     (:delete
-                     (setf (getf key args) (when vals (set-difference (getf key args) vals :test #'string-equal))))))
+                     (setf (getf args key) (when vals (set-difference (getf args key) vals :test #'string-equal))))))
                  (:attributes
                   (ecase type
                     (:add
