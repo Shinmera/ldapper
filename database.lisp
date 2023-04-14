@@ -179,6 +179,7 @@
     (when limit (format stream " LIMIT ~d" limit))))
 
 (defun filter-accounts (filter &key limit)
+  (connect)
   (let ((filter (filter-to-sql filter limit)))
     (mapcar #'find-account (postmodern:query filter :column))))
 

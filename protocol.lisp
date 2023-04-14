@@ -149,7 +149,7 @@
                     (:delete
                      (if vals
                          (setf attributes (loop for entry in attributes
-                                                unless (and (string-equal (first entry) key)
+                                                unless (and (string-equal (first entry) attribute)
                                                             (find (second entry) vals :test #'string=))
                                                 collect entry))
                          (filter-attributes attribute))))))))
