@@ -144,7 +144,9 @@
                   (ecase type
                     (:add
                      (dolist (val vals)
-                       (push (list attribute val) attributes)))
+                       (pushnew (list attribute val) attributes :test
+                                (lambda (a b) (and (string-equal (first a) (first b))
+                                                   (string= (second a) (second b)))))))
                     (:replace
                      (filter-attributes attribute)
                      (dolist (val vals)
