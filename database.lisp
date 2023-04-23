@@ -44,16 +44,16 @@
                                         (note :type text)))))
     (unless (find "classes" tables :test #'string= :key #'second)
       (postmodern:query (:create-table 'classes
-                                       ((account :type integer :references ((accounts id)))
+                                       ((account :type integer :references ((accounts id :on-delete :cascade)))
                                         (class :type (varchar 64))))))
     (unless (find "attributes" tables :test #'string= :key #'second)
       (postmodern:query (:create-table 'attributes
-                                       ((account :type integer :references ((accounts id)))
+                                       ((account :type integer :references ((accounts id :on-delete :cascade)))
                                         (key :type (varchar 64))
                                         (value :type text)))))
     (unless (find "admins" tables :test #'string= :key #'second)
       (postmodern:query (:create-table 'admins
-                                       ((account :type integer :references ((accounts id)) :unique T)))))))
+                                       ((account :type integer :references ((accounts id :on-delete :cascade)) :unique T)))))))
 
 (defun list-accounts ()
   (connect)
@@ -262,8 +262,5 @@
   (with-transaction ()
     (let* ((account (ensure-account account))
            (id (getf account :id)))
-      (postmodern:query (:delete-from 'admins :where (:= 'account id)))
-      (postmodern:query (:delete-from 'classes :where (:= 'account id)))
-      (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
       (postmodern:query (:delete-from 'accounts :where (:= 'id id)))
       account)))
