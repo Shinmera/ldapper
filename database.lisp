@@ -57,18 +57,23 @@
 
 (defun list-accounts ()
   (connect)
-  (postmodern:query (:order-by (:select '* :from 'accounts) 'name) :plists))
+  (postmodern:query (:order-by (:select '* (:as (:array (:select 'class :from 'classes :where (:= 'account 'id))) 'classes)
+                                        (:as (:array (:select (:array[] 'key 'value) :from 'attributes :where (:= 'account 'id))) 'attributes)
+                                        (:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
+                                        :from 'accounts)
+                               'name) :plists))
 
 (defun find-account (name)
   (connect)
-  (let* ((account (etypecase name
-                    (integer (postmodern:query (:select '* :from 'accounts :where (:= 'id name)) :plist))
-                    (string (postmodern:query (:select '* :from 'accounts :where (:= 'name name)) :plist))))
-         (id (getf account :id)))
-    (when id
-      (nconc account
-             (list :classes (postmodern:query (:order-by (:select 'class :from 'classes :where (:= 'account id)) 'class) :column)
-                   :attributes (postmodern:query (:order-by (:select 'key 'value :from 'attributes :where (:= 'account id)) 'key)))))))
+  (etypecase name
+    (integer (postmodern:query (:select '* (:as (:array (:select 'class :from 'classes :where (:= 'account 'id))) 'classes)
+                                        (:as (:array (:select (:array[] 'key 'value) :from 'attributes :where (:= 'account 'id))) 'attributes)
+                                        (:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
+                                        :from 'accounts :where (:= 'id name)) :plist))
+    (string (postmodern:query (:select '* (:as (:array (:select 'class :from 'classes :where (:= 'account 'id))) 'classes)
+                                       (:as (:array (:select (:array[] 'key 'value) :from 'attributes :where (:= 'account 'id))) 'attributes)
+                                       (:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
+                                       :from 'accounts :where (:= 'name name)) :plist))))
 
 (defun ensure-account (account-ish)
   (etypecase account-ish
@@ -82,7 +87,7 @@
   (etypecase account
     (integer (postmodern:query (:select '* :from 'admins :where (:= 'account account)) :single))
     (string (account-admin-p (ensure-account account)))
-    (cons (postmodern:query (:select '* :from 'admins :where (:= 'account (getf account :id))) :single))))
+    (cons (eql 1 (getf account :admin-p)))))
 
 (defun (setf account-admin-p) (admin-p account)
   (let ((account (ensure-account account)))
@@ -151,7 +156,7 @@
          (:classes
           (format stream "(LOWER(cls.class)"))
          (T
-          (format stream "(LOWER(~(~a~))" (attribute-key (second filter)))))
+          (format stream "(LOWER(~(ac.~a~))" (attribute-key (second filter)))))
        (ecase (first filter)
          (:= (format stream " = LOWER("))
          (:>= (format stream " >= "))
@@ -168,20 +173,27 @@
          (:classes
           (format stream "(cls.class IS NOT NULL)"))
          (T
-          (format stream "~(~a~) != ''" (attribute-key (second filter))))))
+          (format stream "~(ac.~a~) != ''" (attribute-key (second filter))))))
       (:substring))))
-
+(:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
 (defun filter-to-sql (filter &optional limit)
   (with-output-to-string (stream)
-    (format stream "SELECT id FROM accounts INNER JOIN classes AS cls ON (id = cls.account) INNER JOIN attributes AS atrs ON (id = atrs.account) WHERE ")
+    (format stream "SELECT ac.*,
+ ARRAY(SELECT class FROM classes WHERE account=ac.id) AS classes,
+ ARRAY(SELECT ARRAY[key,value] FROM attributes WHERE account=ac.id) AS attributes,
+ (SELECT 1 FROM admins WHERE account=ac.id) AS \"admin-p\"
+ FROM accounts AS ac
+   INNER JOIN classes AS cls ON (ac.id = cls.account)
+   INNER JOIN attributes AS atrs ON (ac.id = atrs.account)
+ WHERE ")
     (%filter-to-sql filter stream)
-    (format stream " GROUP BY id")
+    (format stream "
+ GROUP BY ac.id")
     (when limit (format stream " LIMIT ~d" limit))))
 
 (defun filter-accounts (filter &key limit)
   (connect)
-  (let ((filter (filter-to-sql filter limit)))
-    (mapcar #'find-account (postmodern:query filter :column))))
+  (postmodern:query (filter-to-sql filter limit) :plists))
 
 (defun authenticate (account password)
   (connect)
@@ -231,15 +243,17 @@
         (postmodern:query (:delete-from 'classes :where (:= 'account id)))
         (when classes
           (postmodern:query (:insert-rows-into 'classes :columns 'account 'class
-                                               :values (loop for class in classes
-                                                             collect (list id class)))))
+                                               :values (map 'list (lambda (c) (list id c)) classes))))
         (setf (getf account :classes) classes))
       (when attributes-p
         (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
         (when attributes
           (postmodern:query (:insert-rows-into 'attributes :columns 'account 'key 'value
-                             :values (loop for (key val) in attributes
-                                           collect (list id key val)))))
+                             :values (etypecase attributes
+                                       ((array T (* 2))
+                                        (loop for y from 0 below (array-dimension attributes 0)
+                                              collect (list id (aref attributes y 0) (aref attributes y 1))))
+                                       (sequence (map 'list (lambda (a) (list* id a)) attributes))))))
         (setf (getf account :attributes) attributes))
       account)))
 
