@@ -23,12 +23,13 @@
 (defun connect ()
   (unless (and postmodern:*database* (postmodern:connected-p postmodern:*database*))
     (v:info :ldapper "Connecting to ~a/~a" *postgres-host* *postgres-db*)
-    (postmodern:connect-toplevel *postgres-db* *postgres-user* *postgres-pass* *postgres-host*)))
+    (setf postmodern:*database* (postmodern:connect *postgres-db* *postgres-user* *postgres-pass* *postgres-host*
+                                                    :pooled-p T))))
 
 (defun disconnect ()
-  (when (and postmodern:*database* (postmodern:connected-p postmodern:*database*))
+  (when postmodern:*database*
     (v:info :ldapper "Disconnecting")
-    (postmodern:disconnect-toplevel)))
+    (postmodern:disconnect postmodern:*database*)))
 
 (defun init-database ()
   (connect)
@@ -175,7 +176,7 @@
          (T
           (format stream "~(ac.~a~) != ''" (attribute-key (second filter))))))
       (:substring))))
-(:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
+
 (defun filter-to-sql (filter &optional limit)
   (with-output-to-string (stream)
     (format stream "SELECT ac.*,
