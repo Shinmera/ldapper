@@ -129,7 +129,7 @@
            (loop for char across string
                  do (case char
                       ((#\' #\\) (write-char #\\ stream)))
-                    (write-char char stream))
+                    (write-char (char-downcase char) stream))
            (write-char #\' stream)))
     (ecase (first filter)
       (:and
@@ -151,26 +151,25 @@
       ((:= :>= :<= :~=)
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "(LOWER(atrs.key) = LOWER(")
+          (format stream "(atrs.key = ")
           (escape (second filter))
-          (format stream ") AND LOWER(atrs.value)"))
+          (format stream " AND LOWER(atrs.value)"))
          (:classes
-          (format stream "(LOWER(cls.class)"))
+          (format stream "(cls.class"))
          (T
-          (format stream "(LOWER(~(ac.~a~))" (attribute-key (second filter)))))
+          (format stream "(~(ac.~a~)" (attribute-key (second filter)))))
        (ecase (first filter)
-         (:= (format stream " = LOWER("))
+         (:= (format stream " = "))
          (:>= (format stream " >= "))
          (:<= (format stream " <= "))
-         (:~= (format stream " ILIKE (")))
-       (escape (third filter))
-       (format stream "))"))
+         (:~= (format stream " ILIKE ")))
+       (escape (string-downcase (third filter)))
+       (format stream ")"))
       (:=*
        (case (attribute-key (second filter))
          (:attributes
-          (format stream "LOWER(atrs.key) = LOWER(")
-          (escape (second filter))
-          (format stream ")"))
+          (format stream "atrs.key = ")
+          (escape (second filter)))
          (:classes
           (format stream "(cls.class IS NOT NULL)"))
          (T
@@ -244,7 +243,7 @@
         (postmodern:query (:delete-from 'classes :where (:= 'account id)))
         (when classes
           (postmodern:query (:insert-rows-into 'classes :columns 'account 'class
-                                               :values (map 'list (lambda (c) (list id c)) classes))))
+                                               :values (map 'list (lambda (c) (list id (string-downcase c))) classes))))
         (setf (getf account :classes) classes))
       (when attributes-p
         (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
@@ -253,8 +252,8 @@
                              :values (etypecase attributes
                                        ((array T (* 2))
                                         (loop for y from 0 below (array-dimension attributes 0)
-                                              collect (list id (aref attributes y 0) (aref attributes y 1))))
-                                       (sequence (map 'list (lambda (a) (list* id a)) attributes))))))
+                                              collect (list id (string-downcase (aref attributes y 0)) (aref attributes y 1))))
+                                       (sequence (map 'list (lambda (a) (list* id (string-downcase (car a)) (cdr a))) attributes))))))
         (setf (getf account :attributes) attributes))
       account)))
 
