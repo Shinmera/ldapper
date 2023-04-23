@@ -140,6 +140,7 @@
                         (process-command (read-command (socket-stream client)) client)))
            (abort ()
              :report "Disconnect the client."
+             (v:info :ldapper "~a Aborting client" client)
              (close client)))
       (disconnect))))
 
