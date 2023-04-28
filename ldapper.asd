@@ -35,4 +35,5 @@
                :crypto-shortcuts
                :lparallel
                :cl-ppcre
-               :babel))
+               :babel
+               :alexandria))

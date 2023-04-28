@@ -147,9 +147,6 @@ The following configuration variables exist:
   LDAPPER_POSTGRES_PASS       --- The password of the postgres user
   LDAPPER_POSTGRES_DB         --- The postgres database to use [ldap]
   LDAPPER_BASE_DN             --- The base domain name to be used.
-  LDAPPER_WORKERS             --- The number of worker threads to
-                                  spawn. Limits the concurrent users.
-                                  [20]
   LDAPPER_CONNECTION_TIMEOUT  --- Number of seconds to wait for input
                                   from a client before timing it out
                                   [300]

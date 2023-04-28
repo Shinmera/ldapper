@@ -12,8 +12,7 @@
 (defvar *connection-timeout* (* 5 60))
 (defvar *user-id* NIL)
 (defvar *group-id* NIL)
-(defvar *workers* 20)
-(defvar *listeners* ())
+(defvar *listeners* (make-hash-table :test 'eq))
 (defvar *thread* NIL)
 
 (defun lower-privileges (user group)
@@ -44,10 +43,18 @@
     (setf (socket listener) (usocket:socket-listen host port :reuse-address T :element-type '(unsigned-byte 8)))
     listener))
 
+(defmethod accept ((listener listener))
+  (let* ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8)))
+         (client (if (context listener)
+                     (make-instance 'ssl-client :socket socket :context (context listener))
+                     (make-instance 'client :socket socket))))
+    (setf (gethash socket *listeners*) client)))
+
 (defmethod close ((listener listener) &key abort)
   (declare (ignore abort))
   (when (socket listener)
     (usocket:socket-close (socket listener))
+    (remhash (socket listener) *listeners*)
     (setf (socket listener) NIL))
   (when (context listener)
     (cl+ssl:ssl-ctx-free (context listener))
@@ -57,7 +64,6 @@
   ((id :accessor id)
    (socket :initarg :socket :initform NIL :accessor socket)
    (socket-stream :initform NIL :accessor socket-stream)
-   (channel :initform (lparallel:make-channel) :accessor channel)
    (account :initform NIL :accessor account)))
 
 (defmethod initialize-instance :after ((client client) &key socket)
@@ -71,11 +77,18 @@
   (print-unreadable-object (client stream :type T)
     (format stream "~a~@[ CLOSED~]" (id client) (open-stream-p (socket-stream client)))))
 
-(defmethod accept ((listener listener))
-  (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
-    (if (context listener)
-        (make-instance 'ssl-client :socket socket :context (context listener))
-        (make-instance 'client :socket socket))))
+(defmethod accept ((client client))
+  (restart-case
+      (handler-bind (((or error sb-ext:timeout) (lambda (e) (v:severe :ldapper e) (abort))))
+        (handler-case
+            (sb-ext:with-timeout 1.0
+              (process-command (read-command (socket-stream client)) client))
+          (end-of-file ()
+            (close client))))
+    (abort (&optional e)
+      :report "Disconnect the client."
+      (v:info :ldapper "~a Aborting client~@[~%  ~a~]" client e)
+      (close client))))
 
 (defmethod close ((client client) &key abort)
   (when (socket-stream client)
@@ -84,6 +97,7 @@
     (setf (socket-stream client) NIL))
   (when (socket client)
     (usocket:socket-close (socket client))
+    (remhash (socket client) *listeners*)
     (setf (socket client) NIL)))
 
 (defclass ssl-client (client)
@@ -94,17 +108,16 @@
     (cl+ssl:with-global-context (context)
       (setf (socket-stream client) (cl+ssl:make-ssl-server-stream (usocket:socket-stream (socket client)))))))
 
-(defun start (&key (servers NIL servers-p) (workers *workers*))
+(defun start (&key (servers NIL servers-p))
   (unwind-protect
        (progn
          (read-config)
          (connect)
          (init-database)
          (v:info :ldapper "Starting server")
-         (unless lparallel:*kernel*
-           (setf lparallel:*kernel* (lparallel:make-kernel workers :name "ldapper-clients")))
          (dolist (server (if servers-p servers *ldap-servers*))
-           (push (apply #'start-listener server) *listeners*))
+           (let ((listener (apply #'start-listener server)))
+             (setf (gethash (socket listener) *listeners*) listener)))
          (when (= 0 (sb-posix:getuid))
            (lower-privileges *user-id* *group-id*))
          (acceptor-loop))
@@ -112,48 +125,13 @@
 
 (defun stop ()
   (v:info :ldapper "Stopping server")
-  (when lparallel:*kernel*
-    (lparallel:end-kernel))
-  (loop for socket = (pop *listeners*)
-        while socket do (close socket))
+  (loop for object being the hash-values of *listeners*
+        do (close object))
   (disconnect))
 
 (defun acceptor-loop ()
   (restart-case
-      (loop for ready = (usocket:wait-for-input (mapcar #'socket *listeners*) :ready-only T)
-            do (loop for socket in ready
-                     for listener = (find socket *listeners* :key #'socket)
-                     for client = (accept listener)
-                     do (lparallel:submit-task (channel client) #'serve client)))
+      (loop (dolist (socket (usocket:wait-for-input (alexandria:hash-table-keys *listeners*) :ready-only T))
+              (accept (gethash socket *listeners*))))
     (abort ()
       :report "Exit the acceptor loop")))
-
-(defmethod serve ((client client))
-  (let ((postmodern:*database* NIL))
-    (unwind-protect
-         (restart-case
-             (handler-bind (((or stream-error usocket:socket-error) #'abort)
-                            (error (lambda (e) (v:severe :ldapper e) (abort))))
-               (loop while (and (socket-stream client) (open-stream-p (socket-stream client)))
-                     for timeout = (nth-value 1 (usocket:wait-for-input (socket client) :timeout *connection-timeout*))
-                     do (when (or (null timeout) (<= timeout 0))
-                          (v:info :ldapper "~a Timing client out" client)
-                          (return (close client)))
-                        (process-command (read-command (socket-stream client)) client)))
-           (abort ()
-             :report "Disconnect the client."
-             (v:info :ldapper "~a Aborting client" client)
-             (close client)))
-      (disconnect))))
-
-(defun start-threaded ()
-  (when (and *thread* (bt:thread-alive-p *thread*))
-    (error "Already running!"))
-  (setf *thread* (bt:make-thread #'start :name "ldapper")))
-
-(defun stop-threaded ()
-  (when (and *thread* (bt:thread-alive-p *thread*))
-    (bt:interrupt-thread *thread* #'abort)
-    (loop while (bt:thread-alive-p *thread*)
-          do (sleep 0.01))
-    (setf *thread* NIL)))
