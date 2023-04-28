@@ -83,7 +83,7 @@
         (handler-case
             (sb-ext:with-timeout 1.0
               (process-command (read-command (socket-stream client)) client))
-          (end-of-file ()
+          ((or end-of-file sb-int:simple-stream-error) ()
             (close client))))
     (abort (&optional e)
       :report "Disconnect the client."
