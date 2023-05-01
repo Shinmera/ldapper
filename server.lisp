@@ -87,11 +87,16 @@
 
 (defmethod accept ((client client))
   (restart-case
-      (handler-bind (((or error sb-ext:timeout) (lambda (e) (v:severe :ldapper e) (abort))))
+      (handler-bind (((and error (not stream-error))
+                       (lambda (e) (v:severe :ldapper e) (abort e))))
         (handler-case
             (sb-ext:with-timeout 1.0
               (process-command (read-command (socket-stream client)) client))
-          ((or end-of-file sb-int:simple-stream-error) ()
+          (stream-error (e)
+            (v:debug :ldapper "~a stream error, closing~@[~%  ~a~]" client e)
+            (close client))
+          (sb-ext:timeout ()
+            (v:warn :ldapper "~a timed out, closing" client)
             (close client))))
     (abort (&optional e)
       :report "Disconnect the client."
