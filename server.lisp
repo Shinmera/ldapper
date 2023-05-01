@@ -75,6 +75,9 @@
    (account :initform NIL :accessor account)))
 
 (defmethod initialize-instance :after ((client client) &key socket)
+  (setf (usocket:socket-option socket :tcp-keepalive) T)
+  (setf (usocket:socket-option socket :receive-timeout) *connection-timeout*)
+  (setf (usocket:socket-option socket :send-timeout) *connection-timeout*)
   (setf (socket-stream client) (usocket:socket-stream socket))
   (setf (id client) (format NIL "~a:~a"
                             (usocket:vector-quad-to-dotted-quad (usocket:get-peer-address socket))
