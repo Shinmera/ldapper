@@ -32,7 +32,7 @@
 
 (defmethod initialize-instance :after ((object socket-object) &key)
   (when (socket object)
-    (setf (gethash (socket object) *listeners*) (socket object))))
+    (setf (gethash (socket object) *listeners*) object)))
 
 (defmethod close ((object socket-object) &key abort)
   (declare (ignore abort))
@@ -42,8 +42,7 @@
     (setf (socket object) NIL)))
 
 (defclass listener (socket-object)
-  ((socket :initform NIL :accessor socket)
-   (context :initform NIL :accessor context)))
+  ((context :initarg :context :initform NIL :accessor context)))
 
 (defun start-listener (host port &key ssl-certificate ssl-certificate-key ssl-certificate-password)
   (let (context)
