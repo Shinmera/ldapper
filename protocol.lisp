@@ -139,12 +139,19 @@
                    (setf (getf args key) (when vals (set-difference (getf args key) vals :test #'string-equal))))))
                (:attributes
                 (flet ((filter-attributes (key &optional vals)
-                         (setf attributes (loop for i from 0 below (array-dimension attributes 0)
-                                                for k = (aref attributes i 0)
-                                                for v = (aref attributes i 1)
-                                                unless (and (string-equal k key)
-                                                            (or (null vals) (find v vals :test #'string=)))
-                                                collect (list k v)))))
+                         (etypecase attributes
+                           (cons
+                            (loop for entry in attributes
+                                  unless (and (string-equal (first entry) key)
+                                              (or (null vals) (find (second entry) vals :test #'string=)))
+                                  collect entry))
+                           ((array T (2))
+                            (setf attributes (loop for i from 0 below (array-dimension attributes 0)
+                                                   for k = (aref attributes i 0)
+                                                   for v = (aref attributes i 1)
+                                                   unless (and (string-equal k key)
+                                                               (or (null vals) (find v vals :test #'string=)))
+                                                   collect (list k v)))))))
                   (ecase type
                     (:add
                      (setf attributes (loop for i from 0 below (array-dimension attributes 0)
