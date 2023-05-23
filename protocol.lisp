@@ -154,8 +154,9 @@
                                                    collect (list k v)))))))
                   (ecase type
                     (:add
-                     (setf attributes (loop for i from 0 below (array-dimension attributes 0)
-                                            collect (list (aref attributes i 0) (aref attributes i 1))))
+                     (when (typep attributes '(array T (* 2)))
+                       (setf attributes (loop for i from 0 below (array-dimension attributes 0)
+                                              collect (list (aref attributes i 0) (aref attributes i 1)))))
                      (dolist (val vals)
                        (pushnew (list attribute val) attributes :test
                                 (lambda (a b) (and (string-equal (first a) (first b))
