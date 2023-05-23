@@ -145,7 +145,7 @@
                                   unless (and (string-equal (first entry) key)
                                               (or (null vals) (find (second entry) vals :test #'string=)))
                                   collect entry))
-                           ((array T (2))
+                           ((array T (* 2))
                             (setf attributes (loop for i from 0 below (array-dimension attributes 0)
                                                    for k = (aref attributes i 0)
                                                    for v = (aref attributes i 1)
