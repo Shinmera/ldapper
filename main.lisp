@@ -169,10 +169,12 @@ Then from environment variables
     (sb-sys:interactive-interrupt ()
       (v:info :ldapper "Exiting from interrupt")
       (v:sync)
+      (finish-output *error-output*)
       (sb-ext:exit :code 0))
     (error (e)
       (v:error :ldapper "Error: ~a" e)
       (v:sync)
-      (sb-ext:exit :code 1))))
+      (finish-output *error-output*)
+      (sb-ext:exit :code 3))))
 
 (pushnew #'v:remove-global-controller uiop:*image-dump-hook*)
