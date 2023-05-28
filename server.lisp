@@ -147,7 +147,12 @@
 
 (defun acceptor-loop ()
   (restart-case
-      (loop (dolist (socket (usocket:wait-for-input (alexandria:hash-table-keys *listeners*) :ready-only T))
+      (loop (dolist (socket (handler-case (usocket:wait-for-input (alexandria:hash-table-keys *listeners*) :ready-only T)
+                              (usocket:socket-error (e)
+                                (v:error :ldapper "Socket failed while waiting: ~a" e)
+                                (v:debug :ldapper e)
+                                (remhash socket *listeners*)
+                                ())))
               (accept (gethash socket *listeners*))))
     (abort ()
       :report "Exit the acceptor loop"
