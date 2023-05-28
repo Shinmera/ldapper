@@ -58,9 +58,15 @@
 
 (defmethod accept ((listener listener))
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
-    (if (context listener)
-        (make-instance 'ssl-client :socket socket :context (context listener))
-        (make-instance 'client :socket socket))))
+    (handler-case
+        (if (context listener)
+            (make-instance 'ssl-client :socket socket :context (context listener))
+            (make-instance 'client :socket socket))
+      (error (e)
+        (v:error :ldapper "Error during accept: ~a" e)
+        (v:debug :ldapper e)
+        (ignore-errors (usocket:socket-close socket))
+        (remhash socket *listeners*)))))
 
 (defmethod close :after ((listener listener) &key abort)
   (declare (ignore abort))
