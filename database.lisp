@@ -126,7 +126,7 @@
            (write-char #\' stream)
            (loop for char across string
                  do (case char
-                      ((#\' #\\) (write-char #\\ stream)))
+                      ((#\') (write-char #\' stream)))
                     (write-char (char-downcase char) stream))
            (write-char #\' stream)))
     (ecase (first filter)
