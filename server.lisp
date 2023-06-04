@@ -151,7 +151,7 @@
 (defun acceptor-loop ()
   (restart-case
       (loop (dolist (socket (handler-case (usocket:wait-for-input (alexandria:hash-table-keys *listeners*) :ready-only T)
-                              (usocket:socket-error (e)
+                              ((or usocket:socket-error stream-error) (e)
                                 (v:error :ldapper "Socket failed while waiting: ~a" e)
                                 (v:debug :ldapper e)
                                 (remhash socket *listeners*)
