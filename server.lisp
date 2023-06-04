@@ -127,7 +127,9 @@
 
 (defun start (&key (servers NIL servers-p))
   (unwind-protect
-       (progn
+       (handler-bind ((error (lambda (e)
+                               (v:error :ldapper "Unhandled error in server: ~a" e)
+                               (v:trace :ldapper e))))
          (read-config)
          (connect)
          (init-database)
@@ -136,7 +138,8 @@
            (apply #'start-listener server))
          (when (= 0 (sb-posix:getuid))
            (lower-privileges *user-id* *group-id*))
-         (acceptor-loop))
+         (acceptor-loop)
+         (v:info :ldapper "Exiting gracefully"))
     (stop)))
 
 (defun stop ()
