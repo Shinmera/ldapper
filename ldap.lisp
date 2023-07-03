@@ -1,9 +1,3 @@
-#|
- This file is a part of ldapper
- (c) 2023 Shirakumo http://tymoon.eu (shinmera@tymoon.eu)
- Author: Nicolas Hafner <shinmera@tymoon.eu>
-|#
-
 (in-package #:org.shirakumo.ldapper)
 
 (defvar +ldap-disconnect+ "1.3.6.1.4.1.1466.20036")

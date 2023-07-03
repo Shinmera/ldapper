@@ -1,14 +1,8 @@
-#|
- This file is a part of ldapper
- (c) 2023 Shirakumo http://tymoon.eu (shinmera@tymoon.eu)
- Author: Nicolas Hafner <shinmera@tymoon.eu>
-|#
-
 (asdf:defsystem ldapper
   :version "1.0.3"
   :license "zlib"
-  :author "Nicolas Hafner <shinmera@tymoon.eu>"
-  :maintainer "Nicolas Hafner <shinmera@tymoon.eu>"
+  :author "Yukari Hafner <shinmera@tymoon.eu>"
+  :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "A simple LDAP server for user accounts."
   :homepage "https://shinmera.github.io/ldapper"
   :bug-tracker "https://github.com/shinmera/ldapper/issues"
