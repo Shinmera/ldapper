@@ -106,30 +106,33 @@
         (T
          :attributes)))
 
-(defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn)
+(defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn attributes)
   (let ((account (ensure-account account))
         (record ())
         (tmp (make-hash-table :test 'equalp)))
-    (unless skip-dn
-      (push (list "dn" (account-dn account :base-dn base-dn)) record))
-    (push (list* "objectClass" (coerce (getf account :classes) 'list)) record)
-    (push (list "cn" (getf account :name)) record)
-    (push (list "mail" (getf account :mail)) record)
-    (when trusted
-      (push (list "userPassword" (base64:string-to-base64-string (getf account :password))) record))
-    (push (list "displayName" (getf account :real-name)) record)
-    (push (list "note" (getf account :note)) record)
-    (let ((attrs (getf account :attributes)))
-      (etypecase attrs
-        (list
-         (loop for (key . vals) in attrs
-               do (setf (gethash key tmp) (append vals (gethash key tmp)))))
-        ((array T (* 2))
-         (loop for y from 0 below (array-dimension attrs 0)
-               do (push (aref attrs y 1) (gethash (aref attrs y 0) tmp))))))
-    (loop for key being the hash-keys of tmp using (hash-value vals)
-          do (push (list* key vals) record))
-    (nreverse record)))
+    (flet ((add (attribute &rest values)
+             (when (or (null attributes) (find attribute attributes :test #'string-equal))
+               (push (list* attribute values) record))))
+      (unless skip-dn
+        (add "dn" (account-dn account :base-dn base-dn)))
+      (apply #'add "objectClass" (coerce (getf account :classes) 'list))
+      (add "cn" (getf account :name))
+      (add "mail" (getf account :mail))
+      (when trusted
+        (add "userPassword" (base64:string-to-base64-string (getf account :password))))
+      (add "displayName" (getf account :real-name))
+      (add "note" (getf account :note))
+      (let ((attrs (getf account :attributes)))
+        (etypecase attrs
+          (list
+           (loop for (key . vals) in attrs
+                 do (setf (gethash key tmp) (append vals (gethash key tmp)))))
+          ((array T (* 2))
+           (loop for y from 0 below (array-dimension attrs 0)
+                 do (push (aref attrs y 1) (gethash (aref attrs y 0) tmp))))))
+      (loop for key being the hash-keys of tmp using (hash-value vals)
+            do (apply #'add key vals))
+      (nreverse record))))
 
 (defun account->ldif-text (account &rest args &key (output NIL) (base-dn *base-dn*) trusted)
   (etypecase output

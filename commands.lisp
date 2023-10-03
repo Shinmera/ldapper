@@ -198,7 +198,7 @@
    (paging-size :initarg :paging-size :initform NIL :accessor paging-size)
    (paging-cookie :initarg :paging-cookie :initform NIL :accessor paging-cookie)))
 
-(define-simple-print lookup filter)
+(define-simple-print lookup filter attributes)
 
 (defmethod response-tag ((command lookup)) 'lookup-done)
 

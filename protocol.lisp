@@ -170,7 +170,10 @@
     (dolist (account (filter-accounts (filter command) :limit (when (< 0 (size command)) (size command))))
       (send (make-instance 'lookup-entry :client (client command) :id (id command)
                                          :domain-name (account-dn account)
-                                         :attributes (account->ldap-record account :skip-dn T :trusted admin-p)))))
+                                         :attributes (account->ldap-record account
+                                                                           :skip-dn T 
+                                                                           :trusted admin-p
+                                                                           :attributes (attributes command))))))
   (reply command))
 
 (defmethod process-command ((command extended) (client client))
