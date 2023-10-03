@@ -6,6 +6,8 @@
    (message :initarg :message :initform "Ok." :accessor message)
    (referrals :initarg :referrals :initform NIL :accessor referrals)))
 
+(define-simple-print result code message)
+
 (defmethod tag ((result result))
   (type-of result))
 
@@ -20,6 +22,8 @@
 (defclass bind-response (result)
   ((sasl-response :initarg :sasl-response :initform NIL :accessor sasl-response)))
 
+(define-simple-print bind-response sasl-response)
+
 (defmethod encode-object ((result bind-response) vec)
   (call-next-method)
   (when (sasl-response result)
@@ -28,6 +32,8 @@
 (defclass lookup-entry (message)
   ((domain-name :initarg :domain-name :accessor domain-name)
    (attributes :initarg :attributes :initform () :accessor attributes)))
+
+(define-simple-print lookup-entry domain-name attributes)
 
 (defmethod encode-object ((result lookup-entry) vec)
   (encode (domain-name result) vec)
@@ -56,6 +62,8 @@
 (defclass extended-response (result)
   ((oid :initarg :oid :initform NIL :accessor oid)
    (value :initarg :value :initform NIL :accessor value)))
+
+(define-simple-print extended-response oid value)
 
 (defmethod encode-object ((result extended-response) vec)
   (call-next-method)
