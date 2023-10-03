@@ -8,6 +8,7 @@
                                       (cons (getf account :name))))))
 
 (defmethod send ((message message))
+  (v:trace :ldapper "~a Sending ~a" (client message) message)
   (let ((stream (socket-stream (client message))))
     (write-sequence (encode-message message) stream)
     (finish-output stream)))
