@@ -108,6 +108,8 @@
 (defmethod close :before ((client client) &key abort)
   (when (socket-stream client)
     (v:debug :ldapper "~a Closing connection" client)
+    (unless abort
+      (ignore-errors (finish-output (socket-stream client))))
     (close (socket-stream client) :abort abort)
     (setf (socket-stream client) NIL)))
 
