@@ -167,13 +167,23 @@
 
 (defmethod process-command ((command lookup) (client client))
   (let ((admin-p (and (account client) (account-admin-p (account client)))))
-    (dolist (account (filter-accounts (filter command) :limit (when (< 0 (size command)) (size command))))
-      (send (make-instance 'lookup-entry :client (client command) :id (id command)
-                                         :domain-name (account-dn account)
-                                         :attributes (account->ldap-record account
-                                                                           :skip-dn T 
-                                                                           :trusted admin-p
-                                                                           :attributes (attributes command))))))
+    (if (string-equal *base-dn* (base command))
+        (dolist (account (filter-accounts (filter command) :limit (when (< 0 (size command)) (size command))))
+          (send (make-instance 'lookup-entry :client (client command) :id (id command)
+                                             :domain-name (account-dn account)
+                                             :attributes (account->ldap-record account
+                                                                               :skip-dn T 
+                                                                               :trusted admin-p
+                                                                               :attributes (attributes command)))))
+        (let ((s-parts (cl-ppcre:split " *,+ *" (base command)))
+              (d-parts (cl-ppcre:split " *,+ *" *base-dn*)))
+          (loop for s in s-parts
+                for d = (pop d-parts)
+                do (unless (string-equal s d)
+                     (return))
+                finally (when d-parts
+                          (send (make-instance 'lookup-entry :client (client command) :id (id command)
+                                                             :domain-name (format NIL "~a,~a" (base command) (first d-parts)))))))))
   (reply command))
 
 (defmethod process-command ((command extended) (client client))

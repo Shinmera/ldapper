@@ -134,7 +134,7 @@
             do (apply #'add key vals))
       (nreverse record))))
 
-(defun account->ldif-text (account &rest args &key (output NIL) (base-dn *base-dn*) trusted)
+(defun account->ldif-text (account &rest args &key (output NIL) (base-dn *base-dn*) trusted attributes)
   (etypecase output
     (null
      (with-output-to-string (stream)
@@ -143,9 +143,10 @@
      (with-open-file (stream output :direction :output)
        (apply #'account->ldif-text account :output stream args)))
     (stream
-     (loop for (attribute . values) in (account->ldap-record (ensure-account account) :base-dn base-dn :trusted trusted)
-           do (dolist (val values)
-                (format output "~a: ~a~%" attribute val)))
+     (let ((record (account->ldap-record (ensure-account account) :base-dn base-dn :trusted trusted :attributes attributes)))
+       (loop for (attribute . values) in record
+             do (dolist (val values)
+                  (format output "~a: ~a~%" attribute val))))
      (terpri output))))
 
 (defun import-from-ldif (input &rest args &key (dry-run T) (required-attributes *required-attributes*) (ignored-attributes *ignored-attributes*))
