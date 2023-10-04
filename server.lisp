@@ -36,9 +36,10 @@
     (setf (socket object) NIL)))
 
 (defclass listener (socket-object)
-  ((context :initarg :context :initform NIL :accessor context)))
+  ((context :initarg :context :initform NIL :accessor context)
+   (id :accessor id)))
 
-(defun start-listener (host port &key ssl-certificate ssl-certificate-key ssl-certificate-password)
+(defun start-listener (host port &rest args &key ssl-certificate ssl-certificate-key ssl-certificate-password)
   (let (context)
     (cond ((and ssl-certificate ssl-certificate-key)
            (setf context (cl+ssl:make-context :certificate-chain-file (uiop:native-namestring ssl-certificate)
@@ -48,7 +49,7 @@
            (error "Need both ssl-certificate and ssl-certificate-key")))
     (v:info :ldapper "Listening on ~a:~a~@[ SSL~*~]" host port ssl-certificate)
     (make-instance 'listener :socket (usocket:socket-listen host port :reuse-address T :element-type '(unsigned-byte 8))
-                             :context context)))
+                             :context context :id (list* host port args))))
 
 (defmethod accept ((listener listener))
   (let ((socket (usocket:socket-accept (socket listener) :element-type '(unsigned-byte 8))))
@@ -137,6 +138,21 @@
          (acceptor-loop)
          (v:info :ldapper "Exiting gracefully"))
     (stop)))
+
+(defun adapt-servers ()
+  (loop for listener being the hash-values of *listeners*
+        do (when (and (typep listener 'listener)
+                      (not (find (id listener) *ldap-servers* :test #'equal)))
+             (close listener)))
+  (loop for server in *ldap-servers*
+        do (when (not (find server *listeners* :key #'id :test #'equal))
+             (apply #'start-listener server))))
+
+(defun reload ()
+  (read-config)
+  (disconnect)
+  (init-database)
+  (adapt-servers))
 
 (defun stop ()
   (v:info :ldapper "Stopping server")
