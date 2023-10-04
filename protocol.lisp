@@ -188,7 +188,15 @@
                                                             ;;("subschemaSubentry" "")
                                                             ("vendorName" "ldapper")
                                                             ("vendorVersion" #.(asdf:component-version (asdf:find-system :ldapper)))
-                                                            ("objectClass" "top")))))
+                                                            ("objectClass" "top"))))
+           (send (make-instance 'lookup-entry :client (client command) :id (id command)
+                                              :domain-name *base-dn*
+                                              :attributes `(("objectClass" "dcObject"))))
+           (send (make-instance 'lookup-entry :client (client command) :id (id command)
+                                              :domain-name "olcDatabase=ldapper,cn=config"
+                                              :attributes `(("objectClass" "olcDatabaseConfig")
+                                                            ("olcDatabase" "ldapper")
+                                                            ("olcRootDN" ,*base-dn*)))))
           (T
            (let ((s-parts (cl-ppcre:split " *,+ *" (base command)))
                  (d-parts (cl-ppcre:split " *,+ *" *base-dn*)))
@@ -198,7 +206,9 @@
                         (return))
                    finally (when d-parts
                              (send (make-instance 'lookup-entry :client (client command) :id (id command)
-                                                                :domain-name (format NIL "~a,~a" (base command) (first d-parts))))))))))
+                                                                :domain-name (format NIL "~a,~a" (base command) (first d-parts))
+                                                                :attributes `(("objectClass" "dcObject")
+                                                                              ("dc" ,(first d-parts)))))))))))
   (reply command))
 
 (defmethod process-command ((command extended) (client client))
