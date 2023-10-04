@@ -166,7 +166,8 @@
     (reply command :domain-name (account-dn account))))
 
 (defmethod process-command ((command lookup) (client client))
-  (let ((admin-p (and (account client) (account-admin-p (account client)))))
+  (let ((admin-p (and (account client) (account-admin-p (account client))))
+        (attrs (unless (equal '("*") (attributes command)) (attributes command))))
     (if (string-equal *base-dn* (base command))
         (dolist (account (filter-accounts (filter command) :limit (when (< 0 (size command)) (size command))))
           (send (make-instance 'lookup-entry :client (client command) :id (id command)
@@ -174,7 +175,7 @@
                                              :attributes (account->ldap-record account
                                                                                :skip-dn T 
                                                                                :trusted admin-p
-                                                                               :attributes (attributes command)))))
+                                                                               :attributes attrs))))
         (let ((s-parts (cl-ppcre:split " *,+ *" (base command)))
               (d-parts (cl-ppcre:split " *,+ *" *base-dn*)))
           (loop for s in s-parts
