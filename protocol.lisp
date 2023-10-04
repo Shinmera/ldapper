@@ -202,7 +202,8 @@
          (send! *base-dn*
                 `(("objectClass" "dcObject")
                   ("dc" ,(second (first (parse-dn *base-dn*))))
-                  ("hasSubordinates" "TRUE"))))
+                  ("hasSubordinates" "TRUE")))
+         (filter! (filter command)))
         ;; Support for listing dcObjects along the base DN
         (T
          (let ((s-parts (parse-dn (base command)))
