@@ -1,5 +1,6 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defvar *pidfile* NIL)
 (defvar *base-dn* NIL)
 (defvar *ldap-servers* '(("0.0.0.0" 389)
                          ("0.0.0.0" 636 :ssl-certificate "ldapper-chain.pem" :ssl-certificate-key "ldapper-key.pem")))
@@ -123,6 +124,10 @@
       (setf (socket-stream client) (cl+ssl:make-ssl-server-stream (usocket:socket-stream (socket client)))))))
 
 (defun start (&key (servers NIL servers-p))
+  (when *pidfile*
+    #+sbcl
+    (alexandria:write-string-into-file (princ-to-string (sb-posix:getpid)) *pidfile*
+                                       :if-exists :supersede))
   (unwind-protect
        (handler-bind ((error (lambda (e)
                                (v:error :ldapper "Unhandled error in server: ~a" e)
@@ -156,6 +161,8 @@
 
 (defun stop ()
   (v:info :ldapper "Stopping server")
+  (when *pidfile*
+    (ignore-errors (uiop:delete-file-if-exists *pidfile*)))
   (loop for object being the hash-values of *listeners*
         do (close object))
   (disconnect))

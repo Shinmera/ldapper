@@ -153,6 +153,8 @@ The following configuration variables exist:
                                   following format, where FILE may be
                                   relative to the configuration file.
     HOST PORT [ssl-cert=FILE] [ssl-key=FILE] [ssl-pass=PASS]
+  LDAPPER_PIDFILE             --- The file to which to write the PID of
+                                  the server when it is started.
 
 The variables are first read from a file at /etc/default/ldapper
 Then from $HOME/.config/ldapper/config

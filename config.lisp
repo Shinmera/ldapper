@@ -26,6 +26,7 @@
                    ((string-equal var "LDAPPER_POSTGRES_PASS") (setf *postgres-pass* val))
                    ((string-equal var "LDAPPER_POSTGRES_DB") (setf *postgres-db* val))
                    ((string-equal var "LDAPPER_BASE_DN") (setf *base-dn* val))
+                   ((string-equal var "LDAPPER_PIDFILE") (setf *pidfile* (if (string/= "" val) val NIL)))
                    ((string-equal var "LDAPPER_CONNECTION_TIMEOUT") (setf *connection-timeout* (parse-integer val)))
                    ((string-equal var "LDAPPER_LISTEN") (push (parse-listen-config val file) listen))
                    ((string-equal var "LDAPPER_USER") (setf *user-id* val))
@@ -57,6 +58,7 @@
     (maybe-set *postgres-pass* "LDAPPER_POSTGRES_PASS")
     (maybe-set *postgres-db* "LDAPPER_POSTGRES_DB")
     (maybe-set *base-dn* "LDAPPER_BASE_DN")
+    (maybe-set *pidfile* "LDAPPER_PIDFILE")
     (maybe-set *user-id* "LDAPPER_USER")
     (maybe-set *group-id* "LDAPPER_GROUP")
     (maybe-set *connection-timeout* "LDAPPER_CONNECTION_TIMEOUT" parse-integer)
@@ -84,6 +86,7 @@
   (when *postgres-pass* (format stream "~&LDAPPER_POSTGRES_PASS=~a~%" *postgres-pass*))
   (when *postgres-db* (format stream "~&LDAPPER_POSTGRES_DB=~a~%" *postgres-db*))
   (when *base-dn* (format stream "~&LDAPPER_BASE_DN=~a~%" *base-dn*))
+  (format stream "~&LDAPPER_PIDFILE=~a~%" *pidfile*)
   (dolist (server *ldap-servers*)
     (destructuring-bind (host port &key ssl-certificate ssl-certificate-key ssl-certificate-password) server
       (format stream "~&LDAPPER_LISTEN=~a ~a~@[ ssl-cert=~a~]~@[ ssl-key=~a~]~@[ ssl-pass=~a~]~%"
