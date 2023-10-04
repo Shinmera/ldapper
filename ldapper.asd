@@ -30,4 +30,5 @@
                :lparallel
                :cl-ppcre
                :babel
-               :alexandria))
+               :alexandria
+               :trivial-signal))

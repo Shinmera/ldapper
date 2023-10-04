@@ -9,6 +9,7 @@
 (defvar *group-id* NIL)
 (defvar *listeners* (make-hash-table :test 'eq))
 (defvar *thread* NIL)
+(defvar *pending-reload* NIL)
 
 (defun lower-privileges (user group)
   #+sbcl
@@ -154,6 +155,7 @@
              (apply #'start-listener server))))
 
 (defun reload ()
+  (v:info :ldapper "Reloading server")
   (read-config)
   (disconnect)
   (init-database)
@@ -182,7 +184,10 @@
                                                :key #'usocket:socket-stream)
                                          *listeners*)
                                 ())))
-              (accept (gethash socket *listeners*))))
+              (accept (gethash socket *listeners*)))
+            (when *pending-reload*
+              (reload)
+              (setf *pending-reload* NIl)))
     (abort ()
       :report "Exit the acceptor loop"
       (v:info :ldapper "Aborting acceptor loop"))))

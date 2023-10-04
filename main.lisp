@@ -8,11 +8,21 @@
   (handler-case
       (destructuring-bind (self &optional (command "help") &rest args) (uiop:raw-command-line-arguments)
         (cond ((string-equal command "start")
-               (start))
+               (trivial-signal:signal-handler-bind
+                   ((:sighup (lambda (c)
+                               (declare (ignore c))
+                               (setf *pending-reload* T))))
+                 (start)))
+              ((string-equal command "reload")
+               (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
+                 #+sbcl (sb-posix:kill pid sb-posix:sighup)))
               ((string-equal command "stop")
-               (error "Not implemented lol"))
+               (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
+                 #+sbcl (sb-posix:kill pid sb-posix:sigint)
+                 #+sbcl (sb-posix:waitpid pid 0)))
               ((string-equal command "list")
-               (dolist (account (list-accounts)) (account->ldif-text account :output *standard-output* :trusted T)))
+               (dolist (account (list-accounts))
+                 (account->ldif-text account :output *standard-output* :trusted T)))
               ((string-equal command "import")
                (let ((add-args ()) (file (pop args)))
                  (loop for (key val) on args by #'cddr
@@ -21,7 +31,8 @@
                                 ((string-equal key "--ignore") (push val (getf add-args :ignored-attributes)))
                                 (T (error "Unknown key argument ~a" key))))
                  (let ((accounts (apply #'import-from-ldif (uiop:parse-native-namestring file) add-args)))
-                   (dolist (account accounts) (account->ldif-text account :output *standard-output* :trusted T)))))
+                   (dolist (account accounts)
+                     (account->ldif-text account :output *standard-output* :trusted T)))))
               ((string-equal command "show")
                (let ((name (pop args)))
                  (unless name (error "NAME required"))
@@ -73,6 +84,8 @@ After=network.target
 
 [Service]
 ExecStart=~a start
+ExecReload=kill -HUP $MAINPID
+ExecStop=kill -INT $MAINPID
 Restart=on-failure
 RestartSec=5s
 
@@ -91,7 +104,8 @@ WantedBy=multi-user.target
 
 Command can be:
   start  --- Start the ldap server
-  stop   --- Stop the ldap server
+  stop   --- Stop the running server
+  reload --- Reload the running server's config
   list   --- List known accounts in LDIF format
   show   --- Show the information about an account
     NAME                 --- The name of the account
