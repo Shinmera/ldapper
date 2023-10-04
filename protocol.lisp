@@ -179,44 +179,44 @@
                                                                                     :skip-dn T 
                                                                                     :trusted admin-p
                                                                                     :attributes attrs))))))
-      (cond ((string-equal *base-dn* (base command))
-             (filter! (filter command)))
-            ((search *base-dn* (base command))
-             (filter! `(:and (:= ,@(first (parse-dn (base command)))) ,(filter command))))
-            ((string-equal "" (base command))
-             (send! "" `(("objectClass" "top")
-                         ("supportedLDAPVersion" "3")
-                         ("supportedSASLMechanisms")
-                         ("supportedExtension" ,@(alexandria:hash-table-keys *extended-oid-map*))
-                         ("supportedControl")
-                         ("supportedFeatures")
-                         ("namingContexts")
-                         ;;("subschemaSubentry" "")
-                         ("vendorName" "ldapper")
-                         ("vendorVersion" #.(asdf:component-version (asdf:find-system :ldapper)))
-                         ("hasSubordinates" "TRUE")))
-             (send! *base-dn*
-                    `(("objectClass" "dcObject")
-                      ("dc" ,(second (first (parse-dn *base-dn*))))
-                      ("hasSubordinates" "TRUE")))
-             (send! "olcDatabase=ldapper,cn=config"
-                    `(("objectClass" "olcDatabaseConfig")
-                      ("olcDatabase" "ldapper")
-                      ("olcRootDN" ,*base-dn*)
-                      ("hasSubordinates" "FALSE"))))
-            (T
-             (let ((s-parts (parse-dn (base command)))
-                   (d-parts (parse-dn *base-dn*)))
-               (loop for s = (pop s-parts)
-                     for d = (pop d-parts)
-                     while (and s d)
-                     do (unless (equalp s d)
-                          (return))
-                     finally (when d-parts
-                               (send! (format NIL "~a,~{~a=~a~}" (base command) d-parts)
-                                      `(("objectClass" "dcObject")
-                                        ("dc" ,(first d-parts))
-                                        ("hasSubordinates" "TRUE"))))))))))
+      (cond
+        ;; List all accounts
+        ((string-equal *base-dn* (base command))
+         (filter! (filter command)))
+        ;; Search for particular account
+        ((search *base-dn* (base command))
+         (filter! `(:and (:= ,@(first (parse-dn (base command)))) ,(filter command))))
+        ;; List root DN
+        ((string-equal "" (base command))
+         (send! "" `(("objectClass" "top")
+                     ("supportedLDAPVersion" "3")
+                     ("supportedSASLMechanisms")
+                     ("supportedExtension" ,@(alexandria:hash-table-keys *extended-oid-map*))
+                     ("supportedControl")
+                     ("supportedFeatures")
+                     ("namingContexts")
+                     ;;("subschemaSubentry" "")
+                     ("vendorName" "ldapper")
+                     ("vendorVersion" #.(asdf:component-version (asdf:find-system :ldapper)))
+                     ("hasSubordinates" "TRUE")))
+         (send! *base-dn*
+                `(("objectClass" "dcObject")
+                  ("dc" ,(second (first (parse-dn *base-dn*))))
+                  ("hasSubordinates" "TRUE"))))
+        ;; Support for listing dcObjects along the base DN
+        (T
+         (let ((s-parts (parse-dn (base command)))
+               (d-parts (parse-dn *base-dn*)))
+           (loop for s = (pop s-parts)
+                 for d = (pop d-parts)
+                 while (and s d)
+                 do (unless (equalp s d)
+                      (return))
+                 finally (when d-parts
+                           (send! (format NIL "~a,~{~a=~a~}" (base command) d-parts)
+                                  `(("objectClass" "dcObject")
+                                    ("dc" ,(first d-parts))
+                                    ("hasSubordinates" "TRUE"))))))))))
   (reply command))
 
 (defmethod process-command ((command extended) (client client))
