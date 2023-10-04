@@ -39,7 +39,7 @@
 
 (defclass listener (socket-object)
   ((context :initarg :context :initform NIL :accessor context)
-   (id :accessor id)))
+   (id :initarg :id :accessor id)))
 
 (defun start-listener (host port &rest args &key ssl-certificate ssl-certificate-key ssl-certificate-password)
   (let (context)
