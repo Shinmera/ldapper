@@ -87,8 +87,8 @@
 
 (defun parse-dn (dn)
   (loop for entry in (cl-ppcre:split " *,+ *" dn)
-        for dc = (cl-ppcre:register-groups-bind (dc) ("dc=(.+)" entry) dc)
-        when dc collect dc))
+        for dc = (cl-ppcre:split " *=+ *" entry)
+        collect dc))
 
 (defun attribute-key (attribute)
   (cond ((or (string-equal "cn" attribute)

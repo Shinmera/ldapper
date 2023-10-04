@@ -170,15 +170,19 @@
         (attrs (unless (equal '("*") (attributes command)) (attributes command))))
     (flet ((send! (domain record)
              (let ((attrs (ldap-record-filter record attrs)))
-               (when attrs (send (make-instance 'lookup-entry :client (client command) :id (id command) :domain-name domain :attributes attrs))))))
-      (cond ((string-equal *base-dn* (base command))
-             (dolist (account (filter-accounts (filter command) :limit (when (< 0 (size command)) (size command))))
+               (when attrs (send (make-instance 'lookup-entry :client (client command) :id (id command) :domain-name domain :attributes attrs)))))
+           (filter! (filter)
+             (dolist (account (filter-accounts filter :limit (when (< 0 (size command)) (size command))))
                (send (make-instance 'lookup-entry :client (client command) :id (id command)
                                                   :domain-name (account-dn account)
                                                   :attributes (account->ldap-record account
                                                                                     :skip-dn T 
                                                                                     :trusted admin-p
-                                                                                    :attributes attrs)))))
+                                                                                    :attributes attrs))))))
+      (cond ((string-equal *base-dn* (base command))
+             (filter! (filter command)))
+            ((search *base-dn* (base command))
+             (filter! `(:and (:= ,@(first (parse-dn (base command)))) ,(filter command))))
             ((string-equal "" (base command))
              (send! "" `(("objectClass" "top")
                          ("supportedLDAPVersion" "3")
@@ -193,7 +197,7 @@
                          ("hasSubordinates" "TRUE")))
              (send! *base-dn*
                     `(("objectClass" "dcObject")
-                      ("dc" ,(first (parse-dn *base-dn*)))
+                      ("dc" ,(second (first (parse-dn *base-dn*))))
                       ("hasSubordinates" "TRUE")))
              (send! "olcDatabase=ldapper,cn=config"
                     `(("objectClass" "olcDatabaseConfig")
@@ -201,17 +205,18 @@
                       ("olcRootDN" ,*base-dn*)
                       ("hasSubordinates" "FALSE"))))
             (T
-             (let ((s-parts (cl-ppcre:split " *,+ *" (base command)))
-                   (d-parts (cl-ppcre:split " *,+ *" *base-dn*)))
-               (loop for s in s-parts
+             (let ((s-parts (parse-dn (base command)))
+                   (d-parts (parse-dn *base-dn*)))
+               (loop for s = (pop s-parts)
                      for d = (pop d-parts)
-                     do (unless (string-equal s d)
+                     while (and s d)
+                     do (unless (equalp s d)
                           (return))
                      finally (when d-parts
-                               (send (make-instance 'lookup-entry :client (client command) :id (id command)
-                                                                  :domain-name (format NIL "~a,~a" (base command) (first d-parts))
-                                                                  :attributes `(("objectClass" "dcObject")
-                                                                                ("dc" ,(first d-parts))))))))))))
+                               (send! (format NIL "~a,~{~a=~a~}" (base command) d-parts)
+                                      `(("objectClass" "dcObject")
+                                        ("dc" ,(first d-parts))
+                                        ("hasSubordinates" "TRUE"))))))))))
   (reply command))
 
 (defmethod process-command ((command extended) (client client))
