@@ -85,6 +85,11 @@
 (defun account-dn (account &key (base-dn *base-dn*))
   (format NIL "cn=~a~@[,~a~]" (getf account :name) base-dn))
 
+(defun parse-dn (dn)
+  (loop for entry in (cl-ppcre:split " *,+ *" dn)
+        for dc = (cl-ppcre:register-groups-bind (dc) ("dc=(.+)" entry) dc)
+        when dc collect dc))
+
 (defun attribute-key (attribute)
   (cond ((or (string-equal "cn" attribute)
              (string-equal "dn" attribute))
@@ -105,6 +110,13 @@
          :classes)
         (T
          :attributes)))
+
+(defun ldap-record-filter (record attributes)
+  (if (or attributes (equal '("*") attributes))
+      (loop for entry in record
+            when (find (car entry) attributes :test #'string-equal)
+            collect entry)
+      record))
 
 (defun account->ldap-record (account &key (base-dn *base-dn*) trusted skip-dn attributes)
   (let ((account (ensure-account account))
