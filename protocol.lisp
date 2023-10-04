@@ -192,7 +192,7 @@
                      ("supportedLDAPVersion" "3")
                      ("supportedSASLMechanisms")
                      ("supportedExtension" ,@(alexandria:hash-table-keys *extended-oid-map*))
-                     ("supportedControl")
+                     ("supportedControl" ,+ldap-control-extension-paging+)
                      ("supportedFeatures")
                      ("namingContexts")
                      ;;("subschemaSubentry" "")
