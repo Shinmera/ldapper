@@ -134,6 +134,7 @@
         (add "userPassword" (base64:string-to-base64-string (getf account :password))))
       (add "displayName" (getf account :real-name))
       (add "note" (getf account :note))
+      (add "hasSubordinates" "FALSE")
       (let ((attrs (getf account :attributes)))
         (etypecase attrs
           (list

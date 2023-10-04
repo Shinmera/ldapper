@@ -180,7 +180,8 @@
                                                                                     :trusted admin-p
                                                                                     :attributes attrs)))))
             ((string-equal "" (base command))
-             (send! "" `(("supportedLDAPVersion" "3")
+             (send! "" `(("objectClass" "top")
+                         ("supportedLDAPVersion" "3")
                          ("supportedSASLMechanisms")
                          ("supportedExtension" ,@(alexandria:hash-table-keys *extended-oid-map*))
                          ("supportedControl")
@@ -189,14 +190,16 @@
                          ;;("subschemaSubentry" "")
                          ("vendorName" "ldapper")
                          ("vendorVersion" #.(asdf:component-version (asdf:find-system :ldapper)))
-                         ("objectClass" "top")))
+                         ("hasSubordinates" "TRUE")))
              (send! *base-dn*
                     `(("objectClass" "dcObject")
-                      ("dc" ,(first (parse-dn *base-dn*)))))
+                      ("dc" ,(first (parse-dn *base-dn*)))
+                      ("hasSubordinates" "TRUE")))
              (send! "olcDatabase=ldapper,cn=config"
                     `(("objectClass" "olcDatabaseConfig")
                       ("olcDatabase" "ldapper")
-                      ("olcRootDN" ,*base-dn*))))
+                      ("olcRootDN" ,*base-dn*)
+                      ("hasSubordinates" "FALSE"))))
             (T
              (let ((s-parts (cl-ppcre:split " *,+ *" (base command)))
                    (d-parts (cl-ppcre:split " *,+ *" *base-dn*)))
