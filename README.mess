@@ -32,3 +32,13 @@ ldapper import <(slapcat -b "dc=example,dc=com")
 (note the ``--dry-run`` flag for that)
 
 And that's pretty much it. For more information, see the help as described above.
+
+## Docker build instructions
+
+::
+docker build -t ldapper .
+
+docker run --rm -it -v "$PWD:/app" ldapper
+::
+
+This will build the `ldapper` binary in the current directory.
