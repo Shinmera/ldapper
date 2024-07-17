@@ -110,11 +110,16 @@ WantedBy=multi-user.target
 
 Command can be:
   start  --- Start the ldap server
+
   stop   --- Stop the running server
+
   reload --- Reload the running server's config
+
   list   --- List known accounts in LDIF format
+
   show   --- Show the information about an account
     NAME                 --- The name of the account
+
   import --- Import accounts from an LDIF file
     FILE                 --- The path of the LDIF file to import.
     --dry-run BOOLEAN    --- Whether to print the results only. [true]
@@ -127,6 +132,7 @@ Command can be:
                              [cn dn mail userPassword givenName sn
                               gecos note objectClass 
                               structuralObjectClass]
+
   add    --- Add a new account. Prints the account info on completion
     NAME                 --- The name of the account
     MAIL                 --- The email address of the account
@@ -137,45 +143,62 @@ Command can be:
                              multiple times
     --attribute KEY=VAL  --- Add an object attribute, can be specified
                              multiple times
+
   remove --- Remove an account
     NAME                 --- The name of the account to remove
+
   passwd --- Change the password of an account
     NAME                 --- Will prompt for the password on STDIN
+
   rename --- Change the username of an account
     NAME                 --- The name of the account to rename
     NEW-NAME             --- The new name of the user account
+
   admin  --- Change whether an account is an admin or not
     NAME                 --- The name of the account to change
     [BOOLEAN]            --- Whether the account should be admin.
                              [true]
+
   install --- Install a basic server setup with systemd
     --unit UNIT          --- The service unit name to use [ldapper]
     --start BOOLEAN      --- Whether to start the service [true]
     --enable BOOLEAN     --- Whether to enable the service [true]
+
   config  --- Print the current configuration
+
   help    --- Show this help
 
 The following configuration variables exist:
 
   LDAPPER_POSTGRES_HOST       --- The hostname of the postgres server
                                   [127.0.0.1]
+
   LDAPPER_POSTGRES_USER       --- The user to connect to postgres with
                                   [ldap]
+
   LDAPPER_POSTGRES_PASS       --- The password of the postgres user
+
   LDAPPER_POSTGRES_DB         --- The postgres database to use [ldap]
+
   LDAPPER_BASE_DN             --- The base domain name to be used.
+
   LDAPPER_CONNECTION_TIMEOUT  --- Number of seconds to wait for input
                                   from a client before timing it out
                                   [300]
+
   LDAPPER_USER                --- The user name to drop privileges to
+
   LDAPPER_GROUP               --- The group name to drop privileges to
+
   LDAPPER_LOG_LEVEL           --- The logging level to use. Can be:
     trace, debug, info, warn, error, severe
+
   LDAPPER_LISTEN              --- Can be specified multiple times to
                                   specify servers must be in the
                                   following format, where FILE may be
                                   relative to the configuration file.
     HOST PORT [ssl-cert=FILE] [ssl-key=FILE] [ssl-pass=PASS]
+
   LDAPPER_PIDFILE             --- The file to which to write the PID of
                                   the server when it is started.
 
