@@ -66,7 +66,7 @@
     (string (postmodern:query (:select '* (:as (:array (:select 'class :from 'classes :where (:= 'account 'id))) 'classes)
                                        (:as (:array (:select (:array[] 'key 'value) :from 'attributes :where (:= 'account 'id))) 'attributes)
                                        (:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
-                                       :from 'accounts :where (:= 'name name)) :plist))))
+                                       :from 'accounts :where (:= 'name (string-downcase name))) :plist))))
 
 (defun ensure-account (account-ish)
   (etypecase account-ish
@@ -198,7 +198,7 @@
   (connect)
   (with-transaction ()
     (let ((id (postmodern:query (:insert-into 'accounts :set
-                                              'name name
+                                              'name (string-downcase name)
                                               'mail mail
                                               'password (if password
                                                             (if already-hashed password (cryptos:rfc-2307-hash password))
@@ -226,7 +226,7 @@
       (flet ((update (karg field value)
                (postmodern:query (:update 'accounts :set field value :where (:= 'id id)))
                (setf (getf account karg) value)))
-        (when name (update :name 'name name))
+        (when name (update :name 'name (string-downcase name)))
         (when mail (update :mail 'mail mail))
         (when real-name (update :real-name 'real-name real-name))
         (when note (update 'note note :note))
