@@ -52,6 +52,12 @@
                    (account->ldif-text account :output *standard-output* :trusted T))))
               ((string-equal command "remove")
                (delete-account (or (first args) (error "NAME required"))))
+              ((string-equal command "rename")
+               (let* ((name (or (pop args) (error "NAME required")))
+                      (new-name (or (pop args) (error "NEW-NAME required"))))
+                 (when (find-account new-name)
+                   (error "An account named ~s already exists." new-name))
+                 (account->ldif-text (edit-account name :name new-name) :output *standard-output* :trusted T)))
               ((string-equal command "passwd")
                (let ((name (pop args)))
                  (unless name (error "NAME required"))
@@ -135,6 +141,9 @@ Command can be:
     NAME                 --- The name of the account to remove
   passwd --- Change the password of an account
     NAME                 --- Will prompt for the password on STDIN
+  rename --- Change the username of an account
+    NAME                 --- The name of the account to rename
+    NEW-NAME             --- The new name of the user account
   admin  --- Change whether an account is an admin or not
     NAME                 --- The name of the account to change
     [BOOLEAN]            --- Whether the account should be admin.
