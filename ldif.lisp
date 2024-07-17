@@ -140,6 +140,7 @@
           (list
            (loop for (key . vals) in attrs
                  do (setf (gethash key tmp) (append vals (gethash key tmp)))))
+          ((array T (0)))
           ((array T (* 2))
            (loop for y from 0 below (array-dimension attrs 0)
                  do (push (aref attrs y 1) (gethash (aref attrs y 0) tmp))))))
