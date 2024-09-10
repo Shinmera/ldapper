@@ -21,8 +21,11 @@
                  #+sbcl (sb-posix:kill pid sb-posix:sigint)
                  #+sbcl (sb-posix:waitpid pid 0)))
               ((string-equal command "list")
-               (dolist (account (list-accounts))
-                 (account->ldif-text account :output *standard-output* :trusted T)))
+               (if (find "--ldif" args :test #'string-equal)
+                   (dolist (account (list-accounts))
+                     (account->ldif-text account :output *standard-output* :trusted T))
+                   (dolist (account (list-accounts))
+                     (format T "~a~%" (getf account :name)))))
               ((string-equal command "import")
                (let ((add-args ()) (file (pop args)))
                  (loop for (key val) on args by #'cddr
@@ -115,7 +118,8 @@ Command can be:
 
   reload --- Reload the running server's config
 
-  list   --- List known accounts in LDIF format
+  list   --- List known accounts
+    --ldif               --- List all fields in LDIF format.
 
   show   --- Show the information about an account
     NAME                 --- The name of the account
