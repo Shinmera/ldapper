@@ -66,7 +66,7 @@
     (string (postmodern:query (:select '* (:as (:array (:select 'class :from 'classes :where (:= 'account 'id))) 'classes)
                                        (:as (:array (:select (:array[] 'key 'value) :from 'attributes :where (:= 'account 'id))) 'attributes)
                                        (:as (:select 1 :from 'admins :where (:= 'account 'id)) 'admin-p)
-                                       :from 'accounts :where (:= 'name (string-downcase name))) :plist))))
+                                       :from 'accounts :where (:= (:lower 'name) (string-downcase name))) :plist))))
 
 (defun ensure-account (account-ish)
   (etypecase account-ish
