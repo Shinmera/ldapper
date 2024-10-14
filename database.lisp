@@ -256,3 +256,74 @@
            (id (getf account :id)))
       (postmodern:query (:delete-from 'accounts :where (:= 'id id)))
       account)))
+
+(defun update-attributes (attributes type attribute &rest vals)
+  (let ((key (attribute-key attribute))
+        (args ()))
+    (ecase key
+      (:name
+       (ecase type
+         ((:add :replace)
+          (setf (getf args key) (cn-from-dn (or (first vals) (error 'attribute-required :attribute "cn")))))
+         (:delete)))
+      (:mail
+       (ecase type
+         ((:add :replace)
+          (setf (getf args key) (or (first vals) (error 'attribute-required :attribute "mail"))))
+         (:delete
+          (setf (getf args key) ""))))
+      ((:note :real-name)
+       (ecase type
+         (:add
+          (setf (getf args key) (or (first vals) "")))
+         (:replace
+          (setf (getf args key) (or (first vals) "")))
+         (:delete
+          (when (or (null vals) (find (getf args key) vals :test #'string=))
+            (setf (getf args key) "")))))
+      (:password
+       (ecase type
+         ((:add :replace)
+          (setf (getf args key) (base64:base64-string-to-string (or (first vals) "")))
+          (setf (getf args :already-hashed) T))
+         (:delete
+          (setf (getf args key) ""))))
+      (:classes
+       (ecase type
+         (:add
+          (setf (getf args key) (append (getf args key) vals)))
+         (:replace
+          (setf (getf args key) vals))
+         (:delete
+          (setf (getf args key) (when vals (set-difference (getf args key) vals :test #'string-equal))))))
+      (:attributes
+       (flet ((filter-attributes (key &optional vals)
+                (etypecase attributes
+                  (cons
+                   (loop for entry in attributes
+                         unless (and (string-equal (first entry) key)
+                                     (or (null vals) (find (second entry) vals :test #'string=)))
+                         collect entry))
+                  ((array T (* 2))
+                   (setf attributes (loop for i from 0 below (array-dimension attributes 0)
+                                          for k = (aref attributes i 0)
+                                          for v = (aref attributes i 1)
+                                          unless (and (string-equal k key)
+                                                      (or (null vals) (find v vals :test #'string=)))
+                                          collect (list k v)))))))
+         (ecase type
+           (:add
+            (when (typep attributes '(array T (* 2)))
+              (setf attributes (loop for i from 0 below (array-dimension attributes 0)
+                                     collect (list (aref attributes i 0) (aref attributes i 1)))))
+            (dolist (val vals)
+              (pushnew (list attribute val) attributes :test
+                       (lambda (a b) (and (string-equal (first a) (first b))
+                                          (string= (second a) (second b)))))))
+           (:replace
+            (filter-attributes attribute)
+            (dolist (val vals)
+              (push (list attribute val) attributes)))
+           (:delete
+            (filter-attributes attribute vals))))))
+    (values attributes args)))

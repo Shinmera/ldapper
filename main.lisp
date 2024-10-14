@@ -53,6 +53,19 @@
                                 (T (error "Unknown key argument ~a" key))))
                  (let ((account (apply #'make-account name mail add-args)))
                    (account->ldif-text account :output *standard-output* :trusted T))))
+              ((string-equal command "edit")
+               (let ((name (pop args)) (action (pop args)) (attr (pop args)) (vals args))
+                 (unless name (error "NAME required"))
+                 (unless action (error "MODE required"))
+                 (unless attr (error "ATTRIBUTE required"))
+                 (let ((account (ensure-account name))
+                       (action (cond ((string-equal action "add") :add)
+                                     ((string-equal action "replace") :replace)
+                                     ((string-equal action "delete") :delete)
+                                     (T (error "Unknown action ~a" action)))))
+                   (multiple-value-bind (attributes args) (apply #'update-attributes (getf account :attributes) action attr vals)
+                     (setf account (apply #'edit-account account :attributes attributes args))
+                     (account->ldif-text account :output *standard-output* :trusted T)))))
               ((string-equal command "remove")
                (delete-account (or (first args) (error "NAME required"))))
               ((string-equal command "rename")
@@ -158,6 +171,15 @@ Command can be:
   rename --- Change the username of an account
     NAME                 --- The name of the account to rename
     NEW-NAME             --- The new name of the user account
+
+  edit   --- Change attributes of an account
+    NAME                 --- The name of the account to edit
+    ACTION               --- The action to take, can be:
+      add                  --- Add a new value to an attribute
+      replace              --- Replace a value of an attribute
+      delete               --- Delete a value or attribute
+    ATTRIBUTE            --- The attribute to modify
+    [VALUE...]           --- The value or values to influence
 
   admin  --- Change whether an account is an admin or not
     NAME                 --- The name of the account to change
