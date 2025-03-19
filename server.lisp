@@ -121,7 +121,7 @@
     (v:debug :ldapper "~a Closing connection" client)
     (unless abort
       (ignore-errors (finish-output (socket-stream client))))
-    (close (socket-stream client) :abort abort)
+    (ignore-errors (close (socket-stream client) :abort abort))
     (setf (socket-stream client) NIL)))
 
 (defclass ssl-client (client)
