@@ -96,7 +96,7 @@
          (args ())
          (attributes (getf account :attributes)))
     (loop for (type attribute . vals) in (modifications command)
-          do (multiple-value-bind (new-attrs new-args) (apply #'update-attributes attributes type attribute vals)
+          do (multiple-value-bind (new-attrs new-args) (apply #'update-attributes account type attribute vals)
                (setf attributes new-attrs)
                (setf args (append new-args args))))
     (apply #'edit-account account :attributes attributes args)

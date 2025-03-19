@@ -257,8 +257,9 @@
       (postmodern:query (:delete-from 'accounts :where (:= 'id id)))
       account)))
 
-(defun update-attributes (attributes type attribute &rest vals)
+(defun update-attributes (account type attribute &rest vals)
   (let ((key (attribute-key attribute))
+        (attributes (getf account :attributes))
         (args ()))
     (ecase key
       (:name
@@ -291,11 +292,11 @@
       (:classes
        (ecase type
          (:add
-          (setf (getf args key) (append (getf args key) vals)))
+          (setf (getf args key) (union (coerce (getf account key) 'list) vals :test #'string-equal)))
          (:replace
           (setf (getf args key) vals))
          (:delete
-          (setf (getf args key) (when vals (set-difference (getf args key) vals :test #'string-equal))))))
+          (setf (getf args key) (when vals (set-difference (coerce (getf account key) 'list) vals :test #'string-equal))))))
       (:attributes
        (flet ((filter-attributes (key &optional vals)
                 (etypecase attributes

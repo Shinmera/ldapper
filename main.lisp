@@ -63,7 +63,7 @@
                                      ((string-equal action "replace") :replace)
                                      ((string-equal action "delete") :delete)
                                      (T (error "Unknown action ~a" action)))))
-                   (multiple-value-bind (attributes args) (apply #'update-attributes (getf account :attributes) action attr vals)
+                   (multiple-value-bind (attributes args) (apply #'update-attributes account action attr vals)
                      (setf account (apply #'edit-account account :attributes attributes args))
                      (account->ldif-text account :output *standard-output* :trusted T)))))
               ((string-equal command "remove")
