@@ -1,5 +1,12 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defmacro do-flags ((value) args &body specs)
+  (let ((key (gensym "KEY")))
+    `(loop for (,key ,value) on ,args by #'cddr
+           do (cond ,@(loop for (k . body) in specs
+                            collect `((string-equal ,key ,(string k)) ,@body))
+                    (T (error "Unknown key argument ~a" ,key))))))
+
 (defun main ()
   (setf *print-right-margin* most-positive-fixnum)
   (v:restart-global-controller)
@@ -8,19 +15,33 @@
   (handler-case
       (destructuring-bind (self &optional (command "help") &rest args) (uiop:raw-command-line-arguments)
         (cond ((string-equal command "start")
-               (loop for (key val) on args by #'cddr
-                     do (cond ((string-equal key "--log-level")
-                               (setf (v:repl-level) (parse-log-level val)))
-                              (T (error "Unknown key argument ~a" key))))
+               (let ((listen ()))
+                 (do-flags (val) args
+                   ("--postgres-host" (setf *postgres-host* val))
+                   ("--postgres-user" (setf *postgres-user* val))
+                   ("--postgres-pass" (setf *postgres-pass* val))
+                   ("--postgres-db" (setf *postgres-db* val))
+                   ("--base-dn" (setf *base-dn* val))
+                   ("--pidfile" (setf *pidfile* (if (string/= "" val) val NIL)))
+                   ("--connection-timeout" (setf *connection-timeout* (parse-integer val)))
+                   ("--listen" (push (parse-listen-config val) listen))
+                   ("--user" (setf *user-id* val))
+                   ("--group" (setf *group-id* val))
+                   ("--log-level" (setf (v:repl-level) (parse-log-level val))))
+                 (when listen (setf *ldap-servers* listen)))
                (trivial-signal:signal-handler-bind
                 ((:sighup (lambda (c)
                             (declare (ignore c))
                             (setf *pending-reload* T))))
                 (start)))
               ((string-equal command "reload")
+               (do-flags (val) args
+                 ("--pidfile" (setf *pidfile* (if (string/= "" val) val NIL))))
                (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
                  #+sbcl (sb-posix:kill pid sb-posix:sighup)))
               ((string-equal command "stop")
+               (do-flags (val) args
+                 ("--pidfile" (setf *pidfile* (if (string/= "" val) val NIL))))
                (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
                  #+sbcl (sb-posix:kill pid sb-posix:sigint)
                  #+sbcl (sb-posix:waitpid pid 0)))
@@ -32,11 +53,10 @@
                      (format T "~a~%" (getf account :name)))))
               ((string-equal command "import")
                (let ((add-args ()) (file (pop args)))
-                 (loop for (key val) on args by #'cddr
-                       do (cond ((string-equal key "--dry-run") (setf (getf add-args :dry-run) (string-equal val "true")))
-                                ((string-equal key "--require") (push val (getf add-args :required-attributes)))
-                                ((string-equal key "--ignore") (push val (getf add-args :ignored-attributes)))
-                                (T (error "Unknown key argument ~a" key))))
+                 (do-flags (val) args 
+                   ("--dry-run" (setf (getf add-args :dry-run) (string-equal val "true")))
+                   ("--require" (push val (getf add-args :required-attributes)))
+                   ("--ignore" (push val (getf add-args :ignored-attributes))))
                  (let ((accounts (apply #'import-from-ldif (uiop:parse-native-namestring file) add-args)))
                    (dolist (account accounts)
                      (account->ldif-text account :output *standard-output* :trusted T)))))
@@ -48,13 +68,12 @@
                (let ((add-args ()) (name (pop args)) (mail (pop args)))
                  (unless name (error "NAME required"))
                  (unless mail (error "MAIL required"))
-                 (loop for (key val) on args by #'cddr
-                       do (cond ((string-equal key "--note") (setf (getf add-args :note) val))
-                                ((string-equal key "--real-name") (setf (getf add-args :real-name) val))
-                                ((string-equal key "--password") (setf (getf add-args :password) val))
-                                ((string-equal key "--class") (push val (getf add-args :classes)))
-                                ((string-equal key "--attribute") (push (cl-ppcre:split "=" val :limit 2) (getf add-args :attributes)))
-                                (T (error "Unknown key argument ~a" key))))
+                 (do-flags (val) args
+                   ("--note" (setf (getf add-args :note) val))
+                   ("--real-name" (setf (getf add-args :real-name) val))
+                   ("--password" (setf (getf add-args :password) val))
+                   ("--class" (push val (getf add-args :classes)))
+                   ("--attribute" (push (cl-ppcre:split "=" val :limit 2) (getf add-args :attributes))))
                  (let ((account (apply #'make-account name mail add-args)))
                    (account->ldif-text account :output *standard-output* :trusted T))))
               ((string-equal command "edit")
@@ -65,6 +84,7 @@
                  (let ((account (ensure-account name))
                        (action (cond ((string-equal action "add") :add)
                                      ((string-equal action "replace") :replace)
+                                     ((string-equal action "set") :replace)
                                      ((string-equal action "delete") :delete)
                                      (T (error "Unknown action ~a" action)))))
                    (multiple-value-bind (attributes args) (apply #'update-attributes account action attr vals)
@@ -96,11 +116,10 @@
                  (setf (account-admin-p name) admin)))
               ((string-equal command "install")
                (let ((unit "ldapper") (start T) (enable T))
-                 (loop for (key val) on args by #'cddr
-                       do (cond ((string-equal key "--unit") (setf unit val))
-                                ((string-equal key "--start") (setf start (string-equal val "true")))
-                                ((string-equal key "--enable") (setf enable (string-equal val "true")))
-                                (T (error "Unknown key argument ~a" key))))
+                 (do-flags (val) args
+                   ("--unit" (setf unit val))
+                   ("--start" (setf start (string-equal val "true")))
+                   ("--enable" (setf enable (string-equal val "true"))))
                  (connect)
                  (v:info :ldapper "Installing ~a" unit)
                  (with-open-file (stream (format NIL "/etc/systemd/system/~a.service" unit) :direction :output)
@@ -131,11 +150,24 @@ WantedBy=multi-user.target
 
 Command can be:
   start  --- Start the ldap server
-    --log-level LEVEL    --- Set the logging output level
+    --postgres-host HOST --- Override the host
+    --postgres-user USER --- Override the user
+    --postgres-pass PASS --- Override the password
+    --postgres-db DB     --- Override the database
+    --base-dn BASE-DN    --- Override the base-dn
+    --pidfile PIDFILE    --- Override the pidfile
+    --connection-timeout SECS
+                         --- Override the connection timeout
+    --listen LISTEN-SPEC --- Override the listener spec
+    --user USER          --- Override the user
+    --group GROUP        --- Override the group
+    --log-level LEVEL    --- Override the logging level
 
   stop   --- Stop the running server
+    --pidfile PIDFILE    --- Override the pidfile
 
   reload --- Reload the running server's config
+    --pidfile PIDFILE    --- Override the pidfile
 
   list   --- List known accounts
     --ldif               --- List all fields in LDIF format.
