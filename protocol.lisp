@@ -120,12 +120,6 @@
                                                                                     :trusted admin-p
                                                                                     :attributes attrs))))))
       (cond
-        ;; List all accounts
-        ((string-equal *base-dn* (base command))
-         (filter! (filter command)))
-        ;; Search for particular account
-        ((search *base-dn* (base command))
-         (filter! `(:and (:= ,@(first (parse-dn (base command)))) ,(filter command))))
         ;; List root DN
         ((string-equal "" (base command))
          (send! "" `(("objectClass" "top")
@@ -139,11 +133,18 @@
                      ("vendorName" "ldapper")
                      ("vendorVersion" #.(asdf:component-version (asdf:find-system :ldapper)))
                      ("hasSubordinates" "TRUE")))
-         (send! *base-dn*
-                `(("objectClass" "dcObject")
-                  ("dc" ,(second (first (parse-dn *base-dn*))))
-                  ("hasSubordinates" "TRUE")))
+         (if *base-dn*
+             (send! *base-dn*
+                    `(("objectClass" "dcObject")
+                      ("dc" ,(second (first (parse-dn *base-dn*))))
+                      ("hasSubordinates" "TRUE")))
+             (filter! (filter command))))
+        ;; List all accounts
+        ((or (null *base-dn*) (string-equal *base-dn* (base command)))
          (filter! (filter command)))
+        ;; Search for particular account
+        ((search *base-dn* (base command))
+         (filter! `(:and (:= ,@(first (parse-dn (base command)))) ,(filter command))))
         ;; Support for listing dcObjects along the base DN
         (T
          (let ((s-parts (parse-dn (base command)))
