@@ -8,11 +8,15 @@
   (handler-case
       (destructuring-bind (self &optional (command "help") &rest args) (uiop:raw-command-line-arguments)
         (cond ((string-equal command "start")
+               (loop for (key val) on args by #'cddr
+                     do (cond ((string-equal key "--log-level")
+                               (setf (v:repl-level) (parse-log-level val)))
+                              (T (error "Unknown key argument ~a" key))))
                (trivial-signal:signal-handler-bind
-                   ((:sighup (lambda (c)
-                               (declare (ignore c))
-                               (setf *pending-reload* T))))
-                 (start)))
+                ((:sighup (lambda (c)
+                            (declare (ignore c))
+                            (setf *pending-reload* T))))
+                (start)))
               ((string-equal command "reload")
                (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
                  #+sbcl (sb-posix:kill pid sb-posix:sighup)))
@@ -127,6 +131,7 @@ WantedBy=multi-user.target
 
 Command can be:
   start  --- Start the ldap server
+    --log-level LEVEL    --- Set the logging output level
 
   stop   --- Stop the running server
 
