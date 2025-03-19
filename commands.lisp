@@ -71,9 +71,11 @@
   ((id :initarg :id :accessor id)))
 
 (defmethod decode-object ((command abandon) vec start end)
-  (with-decoding (id) (vec start end)
-    (setf (id command) id)
-    start))
+  (or (ignore-errors
+       (with-decoding (id) (vec start end)
+         (setf (id command) id)
+         start))
+      end))
 
 (defmethod encode-object ((command abandon) vec)
   (encode (id command) vec))
