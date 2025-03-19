@@ -152,6 +152,8 @@
             (format stream " AND LOWER(atrs.value)"))
            (:classes
             (format stream "(cls.class"))
+           (:name
+            (format stream "(LOWER(ac.name)"))
            (T
             (format stream "(~(ac.~a~)" (attribute-key (second filter)))))
          (ecase (first filter)
