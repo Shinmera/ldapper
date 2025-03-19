@@ -123,50 +123,56 @@
                       ((#\') (write-char #\' stream)))
                     (write-char (char-downcase char) stream))
            (write-char #\' stream)))
-    (ecase (first filter)
-      (:and
-       (format stream "(")
-       (loop for (sub . next) on (rest filter)
-             do (%filter-to-sql sub stream)
-                (when next (format stream " AND ")))
-       (format stream ")"))
-      (:or
-       (format stream "(")
-       (loop for (sub . next) on (rest filter)
-             do (%filter-to-sql sub stream)
-                (when next (format stream " OR ")))
-       (format stream ")"))
-      (:not
-       (format stream "NOT (")
-       (%filter-to-sql (second filter) stream)
-       (format stream ")"))
-      ((:= :>= :<= :~=)
-       (case (attribute-key (second filter))
-         (:attributes
-          (format stream "(atrs.key = ")
-          (escape (second filter))
-          (format stream " AND LOWER(atrs.value)"))
-         (:classes
-          (format stream "(cls.class"))
-         (T
-          (format stream "(~(ac.~a~)" (attribute-key (second filter)))))
-       (ecase (first filter)
-         (:= (format stream " = "))
-         (:>= (format stream " >= "))
-         (:<= (format stream " <= "))
-         (:~= (format stream " ILIKE ")))
-       (escape (string-downcase (third filter)))
-       (format stream ")"))
-      (:=*
-       (case (attribute-key (second filter))
-         (:attributes
-          (format stream "atrs.key = ")
-          (escape (second filter)))
-         (:classes
-          (format stream "(cls.class IS NOT NULL)"))
-         (T
-          (format stream "~(ac.~a~) != ''" (attribute-key (second filter))))))
-      (:substring))))
+    (when (second filter)
+      (ecase (first filter)
+        (:and
+         (format stream "(")
+         (loop for (sub . next) on (rest filter)
+               do (when (and (%filter-to-sql sub stream) next)
+                    (format stream " AND ")))
+         (format stream ")")
+         filter)
+        (:or
+         (format stream "(")
+         (loop for (sub . next) on (rest filter)
+               do (when (and (%filter-to-sql sub stream) next)
+                    (format stream " OR ")))
+         (format stream ")")
+         filter)
+        (:not
+         (format stream "NOT (")
+         (%filter-to-sql (second filter) stream)
+         (format stream ")")
+         filter)
+        ((:= :>= :<= :~=)
+         (case (attribute-key (second filter))
+           (:attributes
+            (format stream "(atrs.key = ")
+            (escape (second filter))
+            (format stream " AND LOWER(atrs.value)"))
+           (:classes
+            (format stream "(cls.class"))
+           (T
+            (format stream "(~(ac.~a~)" (attribute-key (second filter)))))
+         (ecase (first filter)
+           (:= (format stream " = "))
+           (:>= (format stream " >= "))
+           (:<= (format stream " <= "))
+           (:~= (format stream " ILIKE ")))
+         (escape (string-downcase (third filter)))
+         (format stream ")")
+         filter)
+        (:=*
+         (case (attribute-key (second filter))
+           (:attributes
+            (format stream "atrs.key = ")
+            (escape (second filter)))
+           (:classes
+            (format stream "(cls.class IS NOT NULL)"))
+           (T
+            (format stream "~(ac.~a~) != ''" (attribute-key (second filter)))))
+         filter)
+        (:substring)))))
 
 (defun filter-to-sql (filter &optional limit)
   (with-output-to-string (stream)
