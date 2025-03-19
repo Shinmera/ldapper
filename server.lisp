@@ -1,5 +1,6 @@
 (in-package #:org.shirakumo.ldapper)
 
+(defvar *debug* NIL)
 (defvar *pidfile* NIL)
 (defvar *base-dn* NIL)
 (defvar *ldap-servers* '(("0.0.0.0" 389)
@@ -93,10 +94,17 @@
 (defmethod accept ((client client))
   (restart-case
       (handler-bind (((and error (not stream-error))
-                       (lambda (e) (v:severe :ldapper e) (abort e))))
+                       (lambda (e)
+                         (cond (*debug*
+                                (invoke-debugger e))
+                               (T
+                                (v:severe :ldapper e)
+                                (abort e))))))
         (handler-case
-            (sb-ext:with-timeout 1.0
-              (process-command (read-command (socket-stream client)) client))
+            (if *debug*
+                (process-command (read-command (socket-stream client)) client)
+                (sb-ext:with-timeout 1.0
+                  (process-command (read-command (socket-stream client)) client)))
           (stream-error (e)
             (v:debug :ldapper "~a stream error, closing~@[~%  ~a~]" client e)
             (close client))
@@ -131,8 +139,11 @@
                                        :if-exists :supersede))
   (unwind-protect
        (handler-bind ((error (lambda (e)
-                               (v:error :ldapper "Unhandled error in server: ~a" e)
-                               (v:trace :ldapper e))))
+                               (cond (*debug*
+                                      (invoke-debugger e))
+                                     (T
+                                      (v:error :ldapper "Unhandled error in server: ~a" e)
+                                      (v:trace :ldapper e))))))
          (read-config)
          (connect)
          (init-database)

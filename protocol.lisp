@@ -29,7 +29,10 @@
   (v:trace :ldapper "~a Processing ~a" client command)
   (setf (client command) client)
   (handler-case (handler-bind (((and error (not ldapper-error))
-                                 (lambda (e) (v:warn :ldapper e))))
+                                 (lambda (e)
+                                   (if *debug*
+                                       (invoke-debugger e)
+                                       (v:warn :ldapper e)))))
                   (call-next-method))
     (ldapper-error (e)
       (reply command :code (code e) :message (princ-to-string e)))
