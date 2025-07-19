@@ -32,7 +32,10 @@
                                  (lambda (e)
                                    (if *debug*
                                        (invoke-debugger e)
-                                       (v:warn :ldapper e)))))
+                                       (v:warn :ldapper e))))
+                               ((or authentication-failed permission-denied no-such-account)
+                                 (lambda (e)
+                                   (v:warn :ldapper "~a" e))))
                   (call-next-method))
     (ldapper-error (e)
       (reply command :code (code e) :message (princ-to-string e)))
