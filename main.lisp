@@ -7,6 +7,9 @@
                             collect `((string-equal ,key ,(string k)) ,@body))
                     (T (error "Unknown key argument ~a" ,key))))))
 
+(defun command-p (thing &rest commands)
+  (member thing commands :test #'string-equal))
+
 (defun main ()
   (setf *print-right-margin* most-positive-fixnum)
   (v:restart-global-controller)
@@ -14,7 +17,7 @@
   (read-config)
   (handler-case
       (destructuring-bind (self &optional (command "help") &rest args) (uiop:raw-command-line-arguments)
-        (cond ((string-equal command "start")
+        (cond ((command-p command "start")
                (let ((listen ()))
                  (do-flags (val) args
                    ("--postgres-host" (setf *postgres-host* val))
@@ -34,24 +37,24 @@
                             (declare (ignore c))
                             (setf *pending-reload* T))))
                 (start)))
-              ((string-equal command "reload")
+              ((command-p command "reload")
                (do-flags (val) args
                  ("--pidfile" (setf *pidfile* (if (string/= "" val) val NIL))))
                (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
                  #+sbcl (sb-posix:kill pid sb-posix:sighup)))
-              ((string-equal command "stop")
+              ((command-p command "stop")
                (do-flags (val) args
                  ("--pidfile" (setf *pidfile* (if (string/= "" val) val NIL))))
                (let ((pid (parse-integer (alexandria:read-file-into-string *pidfile*))))
                  #+sbcl (sb-posix:kill pid sb-posix:sigint)
                  #+sbcl (sb-posix:waitpid pid 0)))
-              ((string-equal command "list")
+              ((command-p command "list" "ls")
                (if (find "--ldif" args :test #'string-equal)
                    (dolist (account (list-accounts))
                      (account->ldif-text account :output *standard-output* :trusted T))
                    (dolist (account (list-accounts))
                      (format T "~a~%" (getf account :name)))))
-              ((string-equal command "import")
+              ((command-p command "import")
                (let ((add-args ()) (file (pop args)))
                  (do-flags (val) args 
                    ("--dry-run" (setf (getf add-args :dry-run) (string-equal val "true")))
@@ -60,11 +63,11 @@
                  (let ((accounts (apply #'import-from-ldif (uiop:parse-native-namestring file) add-args)))
                    (dolist (account accounts)
                      (account->ldif-text account :output *standard-output* :trusted T)))))
-              ((string-equal command "show")
+              ((command-p command "show" "find")
                (let ((name (pop args)))
                  (unless name (error "NAME required"))
                  (account->ldif-text (ensure-account name) :output *standard-output* :trusted T)))
-              ((string-equal command "add")
+              ((command-p command "add")
                (let ((add-args ()) (name (pop args)) (mail (pop args)))
                  (unless name (error "NAME required"))
                  (unless mail (error "MAIL required"))
@@ -76,7 +79,7 @@
                    ("--attribute" (push (cl-ppcre:split "=" val :limit 2) (getf add-args :attributes))))
                  (let ((account (apply #'make-account name mail add-args)))
                    (account->ldif-text account :output *standard-output* :trusted T))))
-              ((string-equal command "edit")
+              ((command-p command "edit" "ed")
                (let ((name (pop args)) (action (pop args)) (attr (pop args)) (vals args))
                  (unless name (error "NAME required"))
                  (unless action (error "MODE required"))
@@ -90,16 +93,16 @@
                    (multiple-value-bind (attributes args) (apply #'update-attributes account action attr vals)
                      (setf account (apply #'edit-account account :attributes attributes args))
                      (account->ldif-text account :output *standard-output* :trusted T)))))
-              ((string-equal command "remove")
+              ((command-p command "remove" "rm")
                (delete-account (or (first args) (error "NAME required"))))
-              ((string-equal command "rename")
+              ((command-p command "rename" "mv")
                (let* ((name (or (pop args) (error "NAME required")))
                       (new-name (or (pop args) (error "NEW-NAME required"))))
                  (when (and (not (string-equal name new-name))
                             (find-account new-name))
                    (error "An account named ~s already exists." new-name))
                  (account->ldif-text (edit-account name :name new-name) :output *standard-output* :trusted T)))
-              ((string-equal command "passwd")
+              ((command-p command "passwd")
                (let ((name (pop args)))
                  (unless name (error "NAME required"))
                  (let ((account (ensure-account name)) new rep)
@@ -110,11 +113,11 @@
                    (if (equal rep new)
                        (edit-account account :password new)
                        (error "The passwords do not match.")))))
-              ((string-equal command "admin")
+              ((command-p command "admin")
                (let ((name (pop args)) (admin (if args (string-equal "true" (pop args)) T)))
                  (unless name (error "NAME required"))
                  (setf (account-admin-p name) admin)))
-              ((string-equal command "install")
+              ((command-p command "install")
                (let ((unit "ldapper") (start T) (enable T))
                  (do-flags (val) args
                    ("--unit" (setf unit val))
@@ -149,7 +152,61 @@ WantedBy=multi-user.target
                (format *error-output* "Usage: ~a [command] ...
 
 Command can be:
-  start  --- Start the ldap server
+  list ls   --- List known accounts
+    --ldif               --- List all fields in LDIF format.
+
+  show      --- Show the information about an account
+    NAME                 --- The name of the account
+
+  import    --- Import accounts from an LDIF file
+    FILE                 --- The path of the LDIF file to import.
+    --dry-run BOOLEAN    --- Whether to print the results only. [true]
+    --require ATTRIBUTE  --- Specify a necessary attribute for an
+                             account. May be specified multiple times.
+                             [cn mail userPassword]
+    --ignore ATTRIBUTE   --- Ignore an attribute and omit it from the
+                             saved attribute list. May be specified
+                             multiple times.
+                             [cn dn mail userPassword givenName sn
+                              gecos note objectClass 
+                              structuralObjectClass]
+
+  add       --- Add a new account. Prints the account info on completion
+    NAME                 --- The name of the account
+    MAIL                 --- The email address of the account
+    --password PASS      --- The password for the account's login
+    --real-name NAME     --- The \"real name\" of the account holder
+    --note NOTE          --- An optional note about the account
+    --class CLASS        --- Add an object class, can be specified
+                             multiple times
+    --attribute KEY=VAL  --- Add an object attribute, can be specified
+                             multiple times
+
+  remove rm --- Remove an account
+    NAME                 --- The name of the account to remove
+
+  passwd    --- Change the password of an account
+    NAME                 --- Will prompt for the password on STDIN
+
+  rename mv --- Change the username of an account
+    NAME                 --- The name of the account to rename
+    NEW-NAME             --- The new name of the user account
+
+  edit ed   --- Change attributes of an account
+    NAME                 --- The name of the account to edit
+    ACTION               --- The action to take, can be:
+      add                  --- Add a new value to an attribute
+      replace              --- Replace a value of an attribute
+      delete               --- Delete a value or attribute
+    ATTRIBUTE            --- The attribute to modify
+    [VALUE...]           --- The value or values to influence
+
+  admin     --- Change whether an account is an admin or not
+    NAME                 --- The name of the account to change
+    [BOOLEAN]            --- Whether the account should be admin.
+                             [true]
+
+  start     --- Start the ldap server
     --postgres-host HOST --- Override the host
     --postgres-user USER --- Override the user
     --postgres-pass PASS --- Override the password
@@ -163,74 +220,20 @@ Command can be:
     --group GROUP        --- Override the group
     --log-level LEVEL    --- Override the logging level
 
-  stop   --- Stop the running server
+  stop      --- Stop the running server
     --pidfile PIDFILE    --- Override the pidfile
 
-  reload --- Reload the running server's config
+  reload    --- Reload the running server's config
     --pidfile PIDFILE    --- Override the pidfile
 
-  list   --- List known accounts
-    --ldif               --- List all fields in LDIF format.
-
-  show   --- Show the information about an account
-    NAME                 --- The name of the account
-
-  import --- Import accounts from an LDIF file
-    FILE                 --- The path of the LDIF file to import.
-    --dry-run BOOLEAN    --- Whether to print the results only. [true]
-    --require ATTRIBUTE  --- Specify a necessary attribute for an
-                             account. May be specified multiple times.
-                             [cn mail userPassword]
-    --ignore ATTRIBUTE   --- Ignore an attribute and omit it from the
-                             saved attribute list. May be specified
-                             multiple times.
-                             [cn dn mail userPassword givenName sn
-                              gecos note objectClass 
-                              structuralObjectClass]
-
-  add    --- Add a new account. Prints the account info on completion
-    NAME                 --- The name of the account
-    MAIL                 --- The email address of the account
-    --password PASS      --- The password for the account's login
-    --real-name NAME     --- The \"real name\" of the account holder
-    --note NOTE          --- An optional note about the account
-    --class CLASS        --- Add an object class, can be specified
-                             multiple times
-    --attribute KEY=VAL  --- Add an object attribute, can be specified
-                             multiple times
-
-  remove --- Remove an account
-    NAME                 --- The name of the account to remove
-
-  passwd --- Change the password of an account
-    NAME                 --- Will prompt for the password on STDIN
-
-  rename --- Change the username of an account
-    NAME                 --- The name of the account to rename
-    NEW-NAME             --- The new name of the user account
-
-  edit   --- Change attributes of an account
-    NAME                 --- The name of the account to edit
-    ACTION               --- The action to take, can be:
-      add                  --- Add a new value to an attribute
-      replace              --- Replace a value of an attribute
-      delete               --- Delete a value or attribute
-    ATTRIBUTE            --- The attribute to modify
-    [VALUE...]           --- The value or values to influence
-
-  admin  --- Change whether an account is an admin or not
-    NAME                 --- The name of the account to change
-    [BOOLEAN]            --- Whether the account should be admin.
-                             [true]
-
-  install --- Install a basic server setup with systemd
+  install   --- Install a basic server setup with systemd
     --unit UNIT          --- The service unit name to use [ldapper]
     --start BOOLEAN      --- Whether to start the service [true]
     --enable BOOLEAN     --- Whether to enable the service [true]
 
-  config  --- Print the current configuration
+  config    --- Print the current configuration
 
-  help    --- Show this help
+  help      --- Show this help
 
 The following configuration variables exist:
 
