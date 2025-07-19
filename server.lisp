@@ -186,7 +186,8 @@
                               (usocket:socket-error (e)
                                 (v:error :ldapper "Socket failed while waiting: ~a" e)
                                 (v:debug :ldapper e)
-                                (remhash (usocket:socket e) *listeners*)
+                                (ignore-errors
+                                 (remhash (usocket:socket e) *listeners*))
                                 ())
                               (stream-error (e)
                                 (v:error :ldapper "Socket failed while waiting: ~a" e)
