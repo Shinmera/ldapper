@@ -34,8 +34,8 @@
 (defmethod close ((object socket-object) &key abort)
   (declare (ignore abort))
   (when (socket object)
-    (usocket:socket-close (socket object))
     (remhash (socket object) *listeners*)
+    (usocket:socket-close (socket object))
     (setf (socket object) NIL)))
 
 (defclass listener (socket-object)
@@ -180,21 +180,37 @@
         do (close object))
   (disconnect))
 
+(defun ensure-closed (thing)
+  (etypecase thing
+    (usocket:usocket
+     (let ((client (gethash thing *listeners*)))
+       (when client
+         (ignore-errors (close client))
+         (remhash thing *listeners*))
+       (ignore-errors (usocket:socket-close thing))))
+    (stream
+     (ensure-closed (find thing (alexandria:hash-table-keys *listeners*) :key #'usocket:socket-stream)))
+    (socket-object
+     (ensure-closed (socket thing)))
+    (usocket:socket-error
+     (ensure-closed (usocket:socket thing)))
+    (stream-error
+     (ensure-closed (stream-error-stream thing)))
+    (null))
+  thing)
+
 (defun acceptor-loop ()
   (restart-case
       (loop (dolist (socket (handler-case (usocket:wait-for-input (alexandria:hash-table-keys *listeners*) :ready-only T)
                               (usocket:socket-error (e)
                                 (v:error :ldapper "Socket failed while waiting: ~a" e)
                                 (v:debug :ldapper e)
-                                (ignore-errors
-                                 (remhash (usocket:socket e) *listeners*))
+                                (ensure-closed e)
                                 ())
                               (stream-error (e)
                                 (v:error :ldapper "Socket failed while waiting: ~a" e)
                                 (v:debug :ldapper e)
-                                (remhash (find (stream-error-stream e) (alexandria:hash-table-keys *listeners*)
-                                               :key #'usocket:socket-stream)
-                                         *listeners*)
+                                (ensure-closed e)
                                 ())))
               (accept (gethash socket *listeners*)))
             (when *pending-reload*
