@@ -247,7 +247,9 @@
         (setf (getf account :classes) classes))
       (when attributes-p
         (postmodern:query (:delete-from 'attributes :where (:= 'account id)))
-        (when (< 0 (length attributes))
+        (when (etypecase attributes
+                (array (< 0 (array-total-size attributes)))
+                (list (not (null attributes))))
           (postmodern:query (:insert-rows-into 'attributes :columns 'account 'key 'value
                              :values (etypecase attributes
                                        ((array T (* 2))
