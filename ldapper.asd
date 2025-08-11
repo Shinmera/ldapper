@@ -4,9 +4,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "A simple LDAP server for user accounts."
-  :homepage "https://shinmera.github.io/ldapper"
-  :bug-tracker "https://github.com/shinmera/ldapper/issues"
-  :source-control (:git "https://github.com/shinmera/ldapper.git")
+  :homepage "https://shinmera.com/docs/ldapper"
+  :bug-tracker "https://shinmera.com/project/ldapper/issues"
+  :source-control (:git "https://shinmera.com/project/ldapper.git")
   :build-operation "program-op"
   :build-pathname "ldapper"
   :entry-point "org.shirakumo.ldapper::main"
